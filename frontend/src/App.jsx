@@ -138,9 +138,6 @@ const AppContent = () => {
             <Route path="/partner" element={
               <ProtectedRoute allowedRoles={['Rental Partner']}><AdminDashboard /></ProtectedRoute>
             } />
-            <Route path="/partner/products" element={
-              <ProtectedRoute allowedRoles={['Rental Partner']}><ProductCRUD /></ProtectedRoute>
-            } />
             <Route path="/partner/rentals" element={
               <ProtectedRoute allowedRoles={['Rental Partner']}><RentalManagement /></ProtectedRoute>
             } />
@@ -162,18 +159,6 @@ const AppContent = () => {
             } />
             <Route path="/admin/products" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><ProductCRUD /></ProtectedRoute>
-            } />
-            <Route path="/admin/rentals" element={
-              <ProtectedRoute allowedRoles={['Super Admin']}><RentalManagement /></ProtectedRoute>
-            } />
-            <Route path="/admin/pickups" element={
-              <ProtectedRoute allowedRoles={['Super Admin']}><PickupWorkflow /></ProtectedRoute>
-            } />
-            <Route path="/admin/returns" element={
-              <ProtectedRoute allowedRoles={['Super Admin']}><ReturnWorkflow /></ProtectedRoute>
-            } />
-            <Route path="/admin/tickets" element={
-              <ProtectedRoute allowedRoles={['Super Admin']}><AdminTickets /></ProtectedRoute>
             } />
             <Route path="/admin/settings" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><GlobalSettings /></ProtectedRoute>

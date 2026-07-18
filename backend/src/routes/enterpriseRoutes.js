@@ -25,25 +25,25 @@ const router = express.Router();
 router.use(protect);
 
 // Quotation management
-router.get('/quotations', authorize('Super Admin', 'Rental Partner'), getQuotations);
-router.post('/quotations', authorize('Super Admin', 'Rental Partner'), createQuotation);
-router.patch('/quotations/:id/status', authorize('Super Admin', 'Rental Partner'), updateQuotationStatus);
+router.get('/quotations', authorize('Rental Partner'), getQuotations);
+router.post('/quotations', authorize('Rental Partner'), createQuotation);
+router.patch('/quotations/:id/status', authorize('Rental Partner'), updateQuotationStatus);
 
 // Damage inspection & repair tickets
-router.get('/repairs', authorize('Super Admin', 'Rental Partner'), getRepairTickets);
-router.post('/repairs', authorize('Super Admin', 'Rental Partner'), createRepairTicket);
-router.patch('/repairs/:id', authorize('Super Admin', 'Rental Partner'), updateRepairTicket);
+router.get('/repairs', authorize('Rental Partner'), getRepairTickets);
+router.post('/repairs', authorize('Rental Partner'), createRepairTicket);
+router.patch('/repairs/:id', authorize('Rental Partner'), updateRepairTicket);
 
 // Deposit ledger approval
-router.get('/deposits', authorize('Super Admin', 'Rental Partner'), getDeposits);
-router.patch('/deposits/:id', authorize('Super Admin', 'Rental Partner'), updateDepositStatus);
+router.get('/deposits', authorize('Rental Partner'), getDeposits);
+router.patch('/deposits/:id', authorize('Rental Partner'), updateDepositStatus);
 
 // Drivers route assignment
-router.get('/drivers', authorize('Super Admin', 'Rental Partner'), getDriverAssignments);
-router.post('/drivers', authorize('Super Admin', 'Rental Partner'), createDriverAssignment);
+router.get('/drivers', authorize('Rental Partner'), getDriverAssignments);
+router.post('/drivers', authorize('Rental Partner'), createDriverAssignment);
 
 // Marketing campaigns & coupons
-router.get('/coupons', authorize('Super Admin', 'Rental Partner'), getCoupons);
+router.get('/coupons', authorize('Super Admin'), getCoupons);
 router.post('/coupons', authorize('Super Admin'), createCoupon);
 router.post('/coupons/validate', validateCoupon);
 

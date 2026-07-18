@@ -11,8 +11,6 @@ export const OrderHistory = () => {
     const [activeTab, setActiveTab] = useState('All');
     const [selectedQR, setSelectedQR] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
-    const [deliveryConfirm, setDeliveryConfirm] = useState(null); // { orderId, orderNumber }
-    const [confirming, setConfirming] = useState(false);
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -37,6 +35,24 @@ export const OrderHistory = () => {
         return () => window.removeEventListener('rms:order_status_updated', handleStatusUpdate);
     }, []);
 
+    const [signatures, setSignatures] = useState({});
+
+    const handleSignAndPay = async (orderId, signature) => {
+        if (!signature || !signature.trim()) {
+            showToast('Please type your name to sign the agreement', 'warning');
+            return;
+        }
+        try {
+            const res = await api.post(`/rentals/${orderId}/sign-agreement`, { signature });
+            if (res.data.success) {
+                showToast('Payment successful & Contract signed! Order is now Ready for Pickup.', 'success');
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Error occurred during payment.', 'error');
+        }
+    };
+
     const handleRequestReturn = async (orderId) => {
         try {
             const res = await api.post(`/rentals/${orderId}/request-return`);
@@ -49,24 +65,7 @@ export const OrderHistory = () => {
         }
     };
 
-    const handleConfirmDelivery = async () => {
-        if (!deliveryConfirm) return;
-        setConfirming(true);
-        try {
-            const res = await api.post(`/rentals/${deliveryConfirm.orderId}/confirm-delivery`);
-            if (res.data.success) {
-                showToast('Delivery confirmed! Order is now settled & closed. ✅', 'success');
-                setOrders(prev => prev.map(o =>
-                    o._id === deliveryConfirm.orderId ? { ...o, status: 'Delivered' } : o
-                ));
-                setDeliveryConfirm(null);
-            }
-        } catch (err) {
-            showToast(err.response?.data?.message || 'Error confirming delivery.', 'error');
-        } finally {
-            setConfirming(false);
-        }
-    };
+
 
     const handleDeleteOrder = async () => {
         if (!confirmDelete) return;
@@ -98,7 +97,7 @@ export const OrderHistory = () => {
 
 
             <div className="flex gap-2.5 overflow-x-auto pb-1 animate-fade-in">
-                {['All', 'Pending', 'Confirmed', 'Active', 'Overdue', 'Delivered'].map(tab => (
+                {['All', 'Pending', 'Confirmed', 'Ready for Pickup', 'Active', 'Overdue', 'Completed'].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -163,7 +162,7 @@ export const OrderHistory = () => {
 
                                     <span className={`text-[10px] uppercase font-black px-3 py-1 rounded-full border ${order.status === 'Overdue'
                                         ? 'bg-red-500/15 border-red-500 text-red-500'
-                                        : order.status === 'Delivered'
+                                        : order.status === 'Completed' || order.status === 'Delivered'
                                             ? 'bg-emerald-500/15 border-emerald-500 text-emerald-500'
                                             : 'bg-brand-500/15 border-brand-500 text-brand-500'
                                         }`}>
@@ -198,7 +197,7 @@ export const OrderHistory = () => {
                                             rel="noreferrer"
                                             className="inline-flex items-center gap-1 px-3.5 py-2 bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 dark:text-brand-400 text-xs font-bold rounded-xl whitespace-nowrap"
                                         >
-                                            <FileText className="w-4 h-4" /> PDF Invoice <ArrowUpRight className="w-3 h-3" />
+                                            <FileText className="w-4 h-4" /> View Invoice <ArrowUpRight className="w-3 h-3" />
                                         </a>
                                     )}
                                 </div>
@@ -219,20 +218,50 @@ export const OrderHistory = () => {
                                         </div>
                                     </div>
 
-                                    {/* Confirmed → ready for pickup */}
-                                    {order.status === 'Confirmed' && (
+                                    {/* Confirmed & Unpaid → Pay & Sign Contract */}
+                                    {order.status === 'Confirmed' && order.paymentStatus === 'Unpaid' && (
+                                        <div className="p-4 border border-brand-500/25 bg-brand-500/5 rounded-2xl space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 bg-brand-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                    <FileText className="w-4 h-4 text-brand-500" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase">Sign Contract & Complete Payment</p>
+                                                    <p className="text-[10px] text-slate-500">Order approved by partner! Sign agreement contract to authorize security deposit hold and complete rental fee payment.</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Type full legal name to e-sign"
+                                                    className="flex-1 glass-input text-xs font-serif italic"
+                                                    value={signatures[order._id] || ''}
+                                                    onChange={e => setSignatures(prev => ({ ...prev, [order._id]: e.target.value }))}
+                                                />
+                                                <button
+                                                    onClick={() => handleSignAndPay(order._id, signatures[order._id])}
+                                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all whitespace-nowrap"
+                                                >
+                                                    Pay &amp; E-Sign (${order.totalAmount.toFixed(2)})
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Ready for Pickup or Confirmed & Paid */}
+                                    {(order.status === 'Ready for Pickup' || (order.status === 'Confirmed' && order.paymentStatus === 'Paid')) && (
                                         <div className="flex items-center gap-3 rounded-2xl border border-teal-400/40 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 px-4 py-3">
                                             <div className="w-8 h-8 rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
                                                 <MapPin className="w-4 h-4 text-teal-500" />
                                             </div>
                                             <div>
-                                                <p className="text-[11px] font-extrabold text-teal-700 dark:text-teal-300">🎉 Order Confirmed — Ready for Pickup!</p>
-                                                <p className="text-[10px] text-slate-500">Please visit the store and show your QR code to collect your rented items.</p>
+                                                <p className="text-[11px] font-extrabold text-teal-700 dark:text-teal-300">🎉 Ready for Pickup!</p>
+                                                <p className="text-[10px] text-slate-500">Please visit the store and show your Order Ref #{order.orderNumber} to collect your rented items.</p>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Active (picked up) → confirm delivery */}
+                                    {/* Active (picked up) → request return */}
                                     {order.status === 'Active' && (
                                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-brand-400/30 bg-brand-500/5 px-4 py-3">
                                             <div className="flex items-center gap-3">
@@ -241,20 +270,20 @@ export const OrderHistory = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-[11px] font-extrabold text-brand-700 dark:text-brand-300">Items collected — rental in progress</p>
-                                                    <p className="text-[10px] text-slate-500">Done with your rental? Confirm completion to close this order.</p>
+                                                    <p className="text-[10px] text-slate-500">Done with your rental? Submit a return request to schedule logistics return check.</p>
                                                 </div>
                                             </div>
                                             <button
-                                                onClick={() => setDeliveryConfirm({ orderId: order._id, orderNumber: order.orderNumber })}
-                                                className="flex items-center gap-1.5 px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all flex-shrink-0"
+                                                onClick={() => handleRequestReturn(order._id)}
+                                                className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all flex-shrink-0"
                                             >
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> Confirm Return
+                                                <PackageCheck className="w-3.5 h-3.5" /> Request Return
                                             </button>
                                         </div>
                                     )}
 
                                     {/* Delivered */}
-                                    {(order.status === 'Delivered' || order.status === 'Returned') && (
+                                    {(order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Returned') && (
                                         <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/40 bg-emerald-500/5 px-4 py-3">
                                             <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
                                                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -278,8 +307,8 @@ export const OrderHistory = () => {
                                             const steps = [
                                                 { label: 'Agreement Signed', done: order.agreementSigned },
                                                 { label: 'Staff Confirmed', done: order.status !== 'Pending' },
-                                                { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Delivered' || order.status === 'Overdue' },
-                                                { label: 'Settled Closed', done: order.status === 'Delivered' }
+                                                { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Overdue' },
+                                                { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Delivered' }
                                             ];
                                             const doneCount = steps.filter(s => s.done).length;
                                             const pct = doneCount <= 1 ? 0 : doneCount === 2 ? 33.3 : doneCount === 3 ? 66.6 : 100;
@@ -294,8 +323,8 @@ export const OrderHistory = () => {
                                         {[
                                             { label: 'Agreement Signed', done: order.agreementSigned },
                                             { label: 'Staff Confirmed', done: order.status !== 'Pending' },
-                                            { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Delivered' || order.status === 'Overdue' },
-                                            { label: 'Settled Closed', done: order.status === 'Delivered' }
+                                            { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Overdue' },
+                                            { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Delivered' }
                                         ].map((step, idx) => (
                                             <div key={idx} className="flex flex-col items-center gap-2.5 z-10 w-full md:w-1/4">
                                                 <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs transition-all duration-300 ${step.done
@@ -309,30 +338,24 @@ export const OrderHistory = () => {
                                         ))}
                                     </div>
 
-                                    {/* Active order → Delivery Confirmation Banner */}
+                                    {/* Active order → Request Return Banner */}
                                     {order.status === 'Active' && (
-                                        <div className="mt-2 rounded-2xl border border-teal-400/40 bg-gradient-to-r from-teal-500/10 via-emerald-500/10 to-indigo-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                        <div className="mt-2 rounded-2xl border border-brand-400/35 bg-brand-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                                                    <PackageCheck className="w-5 h-5 text-teal-500" />
+                                                <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center flex-shrink-0">
+                                                    <PackageCheck className="w-5 h-5 text-brand-500" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-xs font-extrabold text-teal-700 dark:text-teal-300">Your order is out for delivery!</p>
-                                                    <p className="text-[10.5px] text-slate-500">Received your items? Please confirm delivery to close this order.</p>
+                                                    <p className="text-xs font-extrabold text-brand-700 dark:text-brand-300">Rental Out for Delivery & active</p>
+                                                    <p className="text-[10.5px] text-slate-500">Enjoy your items! Click below when ready to schedule return pickup collection.</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 flex-shrink-0">
                                                 <button
-                                                    onClick={() => setDeliveryConfirm({ orderId: order._id, orderNumber: order.orderNumber })}
-                                                    className="flex items-center gap-1.5 px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all"
+                                                    onClick={() => handleRequestReturn(order._id)}
+                                                    className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all"
                                                 >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Confirm Delivery
-                                                </button>
-                                                <button
-                                                    onClick={() => showToast('You can confirm delivery once you receive your items.', 'info')}
-                                                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-[11px] font-bold rounded-xl transition-all"
-                                                >
-                                                    <XCircle className="w-3.5 h-3.5" /> Not Yet
+                                                    <PackageCheck className="w-3.5 h-3.5" /> Request Return
                                                 </button>
                                             </div>
                                         </div>
@@ -420,49 +443,6 @@ export const OrderHistory = () => {
                 )}
             </AnimatePresence>
 
-            {/* ── Delivery Confirm Modal ── */}
-            <AnimatePresence>
-                {deliveryConfirm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="w-full max-w-sm glass-panel p-6 rounded-3xl space-y-4"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 rounded-2xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0">
-                                    <PackageCheck className="w-6 h-6 text-teal-500" />
-                                </div>
-                                <div>
-                                    <h3 className="font-extrabold text-sm">Confirm Delivery Received?</h3>
-                                    <p className="text-[11px] text-slate-500">Order #{deliveryConfirm.orderNumber}</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                                By confirming, you acknowledge that you have received all rented items in good condition. The order will be marked as <span className="font-bold text-emerald-600">Delivered & Settled</span>.
-                            </p>
-                            <div className="flex gap-3 pt-1">
-                                <button
-                                    disabled={confirming}
-                                    onClick={() => setDeliveryConfirm(null)}
-                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 border border-slate-200/10 text-xs font-bold rounded-xl transition-all disabled:opacity-50"
-                                >
-                                    Not Yet
-                                </button>
-                                <button
-                                    disabled={confirming}
-                                    onClick={handleConfirmDelivery}
-                                    className="flex-1 py-2.5 bg-teal-500 hover:bg-teal-600 text-white text-xs font-extrabold rounded-xl transition-all shadow-md disabled:opacity-60 flex items-center justify-center gap-1.5"
-                                >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    {confirming ? 'Confirming...' : 'Yes, Delivered!'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
         </div>
     );
 };

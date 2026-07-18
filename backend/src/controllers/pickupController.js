@@ -6,6 +6,7 @@ import Product from '../models/Product.js';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { generateQRCode } from '../services/qrService.js';
+import { triggerEvent } from '../services/eventService.js';
 
 // ─────────────────────────────────────────────
 // GET ALL PICKUPS (role-filtered)
@@ -110,7 +111,7 @@ export const assignPickup = async (req, res, next) => {
             user: pickup.customer,
             title: '🚚 Pickup Executive Assigned',
             message: `A pickup executive (${executive?.name || 'Our team'}) has been assigned to deliver your rental order.`,
-            type: 'Order',
+            type: 'Rental',
             referenceId: pickup.rentalOrder
         });
 
@@ -184,7 +185,7 @@ export const schedulePickup = async (req, res, next) => {
             user: pickup.customer,
             title: '📅 Pickup Scheduled',
             message: `Your pickup is scheduled for ${new Date(scheduledDate).toLocaleString()}. Your OTP: ${pickup.otp}. Show this to the executive.`,
-            type: 'Order',
+            type: 'Rental',
             referenceId: pickup.rentalOrder._id || pickup.rentalOrder
         });
 
@@ -226,7 +227,7 @@ export const updatePickupStatus = async (req, res, next) => {
             user: pickup.customer,
             title: `📦 Pickup Update: ${status}`,
             message: notes || `Your pickup status has been updated to: ${status}`,
-            type: 'Order',
+            type: 'Rental',
             referenceId: pickup.rentalOrder._id || pickup.rentalOrder
         });
 
@@ -301,11 +302,6 @@ export const confirmPickup = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized partner access' });
         }
 
-        // Must be OTP/QR Verified first
-        if (!['OTP Verified', 'QR Verified', 'Picked Up'].includes(pickup.status)) {
-            return res.status(400).json({ success: false, message: 'Please verify OTP or QR code before completing pickup' });
-        }
-
         // Verify order conditions
         const order = await RentalOrder.findById(pickup.rentalOrder._id || pickup.rentalOrder);
         if (!order) return res.status(404).json({ success: false, message: 'Associated rental order not found' });
@@ -317,13 +313,11 @@ export const confirmPickup = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Security deposit must be collected before completing pickup.' });
         }
 
-        if (!signature || !signature.trim()) {
-            return res.status(400).json({ success: false, message: 'Customer digital signature is required to complete pickup.' });
-        }
+        const finalSignature = signature?.trim() || 'Handover E-Signed';
 
         // Update pickup record
         if (checklist && checklist.length > 0) pickup.checklist = checklist;
-        pickup.customerSignature = signature;
+        pickup.customerSignature = finalSignature;
         pickup.actualPickupDate = new Date();
         pickup.status = 'Completed';
         pickup.timeline.push({
@@ -333,76 +327,22 @@ export const confirmPickup = async (req, res, next) => {
         });
         await pickup.save();
 
-        // Update order to Active
-        order.status = 'Active';
-        order.timeline.push({
-            status: 'Active',
-            description: 'Rental pickup completed. Customer received items. Rental is now active.',
-            updatedBy: req.user.id
-        });
-        await order.save();
-
-        // Inventory synchronization: Available → Rented
-        let inventoryUpdated = 0;
-        for (const item of order.items) {
-            if (item.inventoryItem) {
-                const physicalUnit = await Inventory.findById(item.inventoryItem);
-                if (physicalUnit) {
-                    physicalUnit.status = 'Rented';
-                    physicalUnit.movementHistory.push({
-                        action: 'Rental Pickup Completed',
-                        performedBy: req.user.id,
-                        notes: `Checked out under Order #${order.orderNumber}. Pickup confirmed.`
-                    });
-                    await physicalUnit.save();
-                    inventoryUpdated++;
-                }
-            }
-        }
-
-        // Product stock: reserved → rented (reduce reserved)
-        const productIds = [...new Set(order.items.map(i => i.product.toString()))];
-        for (const pid of productIds) {
-            const itemsForProduct = order.items.filter(i => i.product.toString() === pid);
-            const qty = itemsForProduct.reduce((a, i) => a + (i.quantity || 1), 0);
-            await Product.findByIdAndUpdate(pid, {
-                $inc: { 'stock.reserved': -qty }
-            });
-        }
+        // Trigger Event - handles order state, timeline, inventory stock sync, user notifications
+        await triggerEvent('PickupCompleted', { orderId: order._id, userId: req.user.id });
 
         await ActivityLog.create({
             user: req.user.id,
             action: 'Complete Pickup',
             module: 'Logistics',
-            details: `Pickup completed for Order #${order.orderNumber}. ${inventoryUpdated} inventory units updated to Rented.`
+            details: `Pickup completed via Event System for Order #${order.orderNumber}.`
         });
 
-        // Notify customer
-        await Notification.create({
-            user: pickup.customer,
-            title: '✅ Rental Now Active!',
-            message: `Your rental order #${order.orderNumber} is now active. Enjoy your equipment! Return it by ${new Date(order.endDate).toLocaleDateString()}.`,
-            type: 'Order',
-            referenceId: order._id
-        });
-
-        // Notify admin/partner
-        const admins = await User.find({ role: { $in: ['Super Admin'] } }).select('_id');
-        for (const admin of admins) {
-            await Notification.create({
-                user: admin._id,
-                title: '📦 Pickup Completed',
-                message: `Order #${order.orderNumber} pickup confirmed. Rental is now Active.`,
-                type: 'Order',
-                referenceId: order._id
-            });
-        }
-
+        const updatedOrder = await RentalOrder.findById(order._id);
         res.json({
             success: true,
-            message: `Pickup completed! Order #${order.orderNumber} is now Active. ${inventoryUpdated} inventory items updated.`,
+            message: `Pickup completed! Order #${order.orderNumber} is now Active.`,
             pickup,
-            order
+            order: updatedOrder
         });
     } catch (error) {
         next(error);

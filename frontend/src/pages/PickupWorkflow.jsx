@@ -324,6 +324,25 @@ export const PickupWorkflow = () => {
         } finally { setActionLoading(false); }
     };
 
+    const handleSimpleConfirmPickup = async () => {
+        setActionLoading(true);
+        try {
+            const res = await api.post(`/pickups/${selectedPickup._id}/confirm`, {
+                signature: 'Handover E-Signed',
+                checklist: selectedPickup.checklist || []
+            });
+            if (res.data.success) {
+                showToast('Pickup completed! Order is now Active.', 'success');
+                setSelectedPickup(res.data.pickup);
+                fetchPickups();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Error completing pickup.', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     //  TABS 
     const TABS = ["All", "Today's", "Upcoming", "Delayed", "Assigned", "Completed", "Cancelled"];
 
@@ -591,6 +610,25 @@ export const PickupWorkflow = () => {
                                 {/* LEFT: Actions */}
                                 <div className="lg:col-span-2 space-y-5">
 
+                                    {/* Direct ERP Action button */}
+                                    {isAdmin && !['Completed', 'Cancelled'].includes(selectedPickup.status) && (
+                                        <div className="p-5 border border-emerald-500/35 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-2xl space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <h4 className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Enterprise ERP Quick Handover</h4>
+                                                    <p className="text-[10px] text-slate-400">Complete logistics pickup immediately and mark the rental order as Active with one-click.</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleSimpleConfirmPickup}
+                                                disabled={actionLoading}
+                                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+                                            >
+                                                {actionLoading ? 'Processing Handover...' : '⚡ Confirm Handover & Complete Pickup'}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {/*  STEP: ASSIGN EXECUTIVE (Pending)  */}
                                     {isAdmin && selectedPickup.status === 'Pending' && (
                                         <form onSubmit={handleAssignSubmit} className="glass-panel p-6 rounded-2xl border border-brand-500/15 space-y-4">
@@ -818,14 +856,14 @@ export const PickupWorkflow = () => {
                                             <p className="text-xs text-slate-400">
                                                 The product has been delivered and the rental order is now <strong>Active</strong>. Inventory updated automatically.
                                             </p>
-                                            <div className="grid grid-cols-2 gap-3 text-[11px] font-mono text-slate-400">
+                                            <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
                                                 <div className="p-3 bg-slate-950/30 rounded-xl">
-                                                    <p className="text-[9px] text-slate-500 mb-1">HANDOVER TIME</p>
-                                                    <p>{selectedPickup.actualPickupDate ? new Date(selectedPickup.actualPickupDate).toLocaleString() : 'N/A'}</p>
+                                                    <p className="text-[9px] text-white/50 mb-1 font-bold">HANDOVER TIME</p>
+                                                    <p className="text-white font-extrabold text-xs">{selectedPickup.actualPickupDate ? new Date(selectedPickup.actualPickupDate).toLocaleString() : 'N/A'}</p>
                                                 </div>
                                                 <div className="p-3 bg-slate-950/30 rounded-xl">
-                                                    <p className="text-[9px] text-slate-500 mb-1">SIGNED BY</p>
-                                                    <p>{selectedPickup.customerSignature || 'N/A'}</p>
+                                                    <p className="text-[9px] text-white/50 mb-1 font-bold">SIGNED BY</p>
+                                                    <p className="text-white font-extrabold text-xs">{selectedPickup.customerSignature || 'N/A'}</p>
                                                 </div>
                                             </div>
                                         </div>

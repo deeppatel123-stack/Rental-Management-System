@@ -1,85 +1,444 @@
-import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import RentalOrder from '../models/RentalOrder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
 export const generateInvoicePDF = async (invoice) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const doc = new PDFDocument({ margin: 50 });
-            const dirPath = path.join(__dirname, '../../public/invoices');
-
-            
-            if (!fs.existsSync(dirPath)) {
-                fs.mkdirSync(dirPath, { recursive: true });
-            }
-
-            const fileName = `invoice-${invoice.invoiceNumber}.pdf`;
-            const filePath = path.join(dirPath, fileName);
-            const writeStream = fs.createWriteStream(filePath);
-
-            doc.pipe(writeStream);
-
-            
-            doc.fillColor('#4B5563').fontSize(20).text('RENTAL MANAGEMENT SYSTEM', { align: 'left' });
-            doc.fontSize(10).text('Professional Rental Solutions & Logistics', { align: 'left' });
-            doc.moveDown();
-
-            
-            doc.fillColor('#1F2937').fontSize(14).text(`INVOICE: #${invoice.invoiceNumber}`, { align: 'right' });
-            doc.fontSize(10).text(`Issued: ${new Date(invoice.issuedDate).toLocaleDateString()}`, { align: 'right' });
-            doc.text(`Type: ${invoice.invoiceType}`, { align: 'right' });
-            doc.text(`Status: ${invoice.paymentStatus}`, { align: 'right' });
-            doc.moveDown(2);
-
-            
-            doc.fillColor('#111827').fontSize(12).text('BILL TO:', { underline: true });
-            doc.fontSize(10).text(`Name: ${invoice.customer.name}`);
-            doc.text(`Email: ${invoice.customer.email}`);
-            doc.moveDown();
-
-            
-            doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke('#E5E7EB');
-            doc.moveDown();
-
-            
-            doc.fontSize(12).text('FINANCIAL SUMMARY', { underline: true });
-            doc.moveDown();
-            doc.fontSize(10);
-
-            doc.text(`Subtotal: $${invoice.subTotal.toFixed(2)}`);
-            doc.text(`Tax: $${invoice.taxAmount.toFixed(2)}`);
-            if (invoice.lateFees > 0) {
-                doc.text(`Late Returns Fee: $${invoice.lateFees.toFixed(2)}`, { fillColor: '#EF4444' });
-            }
-            if (invoice.repairFees > 0) {
-                doc.text(`Repair Assessment Fee: $${invoice.repairFees.toFixed(2)}`, { fillColor: '#EF4444' });
-            }
-            if (invoice.discountAmount > 0) {
-                doc.text(`Discount Applied: -$${invoice.discountAmount.toFixed(2)}`);
-            }
-            doc.moveDown();
-            
-            doc.fillColor('#10B981').fontSize(14).text(`Grand Total: $${invoice.totalAmount.toFixed(2)}`);
-
-            doc.moveDown(2);
-            doc.fillColor('#9CA3AF').fontSize(8).text('Thank you for choosing Rental. If you have questions regarding this billing statement, contact support.', { align: 'center' });
-
-            doc.end();
-
-            writeStream.on('finish', () => {
-                resolve(`/invoices/${fileName}`);
-            });
-
-            writeStream.on('error', (err) => {
-                reject(err);
-            });
-        } catch (error) {
-            reject(error);
+    try {
+        const dirPath = path.join(__dirname, '../../public/invoices');
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
         }
-    });
+
+        const fileName = `invoice-${invoice.invoiceNumber}.html`;
+        const filePath = path.join(dirPath, fileName);
+
+        // Fetch matching RentalOrder from DB to attach lines & details
+        let order = null;
+        if (invoice.rentalOrder) {
+            order = await RentalOrder.findById(invoice.rentalOrder).populate('items.product');
+        }
+
+        // Prepare items list
+        const itemsHtml = order?.items?.map(it => `
+            <tr>
+                <td>${it.name || 'Equipment'}</td>
+                <td>${it.quantity || 1}</td>
+                <td>$${(it.rateApplied || 0).toFixed(2)} / ${it.rateType || 'day'}</td>
+                <td>$${(it.securityDepositApplied || 0).toFixed(2)}</td>
+                <td>$${((it.rateApplied || 0) * (it.quantity || 1)).toFixed(2)}</td>
+            </tr>
+        `).join('') || `
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-secondary);">No item rows detected. Refer to statement logs.</td>
+            </tr>
+        `;
+
+        const signatureText = order?.customerSignature || 'E-Signed Digitally';
+        const signatureSection = (order?.agreementSigned || invoice.paymentStatus === 'Paid') ? `
+            <div class="signature-box">
+                <p class="signature-label">Customer Handover Authorized Signature</p>
+                <div class="signature-line">
+                    <span class="sig-font">${signatureText}</span>
+                </div>
+                <p class="signature-meta">IP Recorded & Secured. Timestamp: ${new Date(invoice.createdAt || Date.now()).toLocaleDateString()}</p>
+            </div>
+        ` : `
+            <div class="signature-box signature-pending">
+                <p class="signature-label">Signature Pending</p>
+                <p style="margin: 0; color: #a1a1aa; font-size: 11px;">Customer signature is required upon handover.</p>
+            </div>
+        `;
+
+        const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice #${invoice.invoiceNumber}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@1,600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-light: #f8fafc;
+            --panel-light: #ffffff;
+            --border-light: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --brand: #f97316;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-primary);
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .invoice-card {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--panel-light);
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 15px 23px -5px rgba(0, 0, 0, 0.05), 0 8px 8px -5px rgba(0, 0, 0, 0.03);
+            position: relative;
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--border-light);
+            padding-bottom: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .logo-section h1 {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
+        }
+        .logo-section h1 span {
+            color: var(--brand);
+        }
+        .logo-section p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .meta-section {
+            text-align: right;
+        }
+        .invoice-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 10px;
+        }
+        .status-paid {
+            background-color: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status-unpaid {
+            background-color: #fff7ed;
+            color: #854d0e;
+            border: 1px solid #fed7aa;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-cols: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .details-block h3 {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--brand);
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .details-block p {
+            font-size: 13.5px;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        .details-block span {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th {
+            padding: 12px 16px;
+            font-size: 10.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-light);
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 16px;
+            font-size: 13.5px;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-light);
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        .financial-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-top: 30px;
+            flex-wrap: wrap;
+            gap: 40px;
+        }
+        .signatures {
+            flex: 1;
+            min-width: 250px;
+        }
+        .signature-box {
+            border: 1px dashed var(--border-light);
+            border-radius: 16px;
+            padding: 20px;
+            background-color: #f8fafc;
+            min-height: 110px;
+        }
+        .signature-label {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            letter-spacing: 0.5px;
+        }
+        .signature-line {
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 10px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .sig-font {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 22px;
+            color: #6b21a8;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+        .signature-meta {
+            font-size: 9px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+        .totals-box {
+            width: 300px;
+            background-color: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 13.5px;
+            color: var(--text-secondary);
+        }
+        .total-row:last-child {
+            margin-bottom: 0;
+            padding-top: 10px;
+            border-top: 2px solid var(--border-light);
+        }
+        .grand-total {
+            font-size: 18px;
+            font-weight: 800;
+            color: #047857;
+        }
+        .negative {
+            color: var(--danger);
+        }
+        .footer {
+            text-align: center;
+            font-size: 11.5px;
+            color: var(--text-secondary);
+            margin-top: 40px;
+            line-height: 1.6;
+            border-top: 1px solid var(--border-light);
+            padding-top: 25px;
+        }
+        .actions-bar {
+            max-width: 800px;
+            width: 100%;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .btn {
+            background-color: var(--brand);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .btn-alt {
+            background-color: var(--panel-light);
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+        }
+        @media print {
+            body {
+                background: white;
+                color: black;
+                padding: 0;
+            }
+            .invoice-card {
+                box-shadow: none;
+                border: none;
+                background: white;
+                color: black;
+                max-width: 100%;
+                padding: 0;
+            }
+            .actions-bar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+        <div class="actions-bar">
+            <button onclick="window.print()" class="btn">🖨 Print Statement</button>
+            <button onclick="window.close()" class="btn btn-alt">❌ Close</button>
+        </div>
+        <div class="invoice-card">
+            <div class="header">
+                <div class="logo-section">
+                    <h1>RENTAL<span>ERP</span></h1>
+                    <p>Professional Enterprise Logistics & Lease Solutions</p>
+                </div>
+                <div class="meta-section">
+                    <div class="invoice-title">INVOICE</div>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">#${invoice.invoiceNumber}</p>
+                    <span class="status-badge ${invoice.paymentStatus === 'Paid' ? 'status-paid' : 'status-unpaid'}">
+                        ${invoice.paymentStatus}
+                    </span>
+                </div>
+            </div>
+
+            <div class="details-grid">
+                <div class="details-block">
+                    <h3>Billing Information</h3>
+                    <p>${invoice.customer?.name || 'Customer'}</p>
+                    <p><span>Email:</span> ${invoice.customer?.email || 'N/A'}</p>
+                    <p><span>Phone:</span> ${invoice.customer?.phone || 'N/A'}</p>
+                </div>
+                <div class="details-block" style="text-align: right;">
+                    <h3>Statement Metadata</h3>
+                    <p><span>Issued:</span> ${new Date(invoice.issuedDate || Date.now()).toLocaleDateString()}</p>
+                    <p><span>Type:</span> ${invoice.invoiceType || 'Rental Statement'}</p>
+                    <p><span>Ref Order:</span> #${order?.orderNumber || 'N/A'}</p>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Qty</th>
+                            <th>Rental Rate</th>
+                            <th>Deposit (Held)</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="financial-summary">
+                <div class="signatures">
+                    ${signatureSection}
+                </div>
+                <div class="totals-box">
+                    <div class="total-row">
+                        <span>Items Subtotal</span>
+                        <span>$${(invoice.subTotal || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Handling & Tax (18%)</span>
+                        <span>$${(invoice.taxAmount || 0).toFixed(2)}</span>
+                    </div>
+                    ${invoice.lateFees > 0 ? `
+                    <div class="total-row negative" style="color: var(--danger);">
+                        <span>Late Overdue Penalty</span>
+                        <span>+$${(invoice.lateFees || 0).toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                    ${invoice.repairFees > 0 ? `
+                    <div class="total-row negative" style="color: var(--danger);">
+                        <span>Assessments / Repairs</span>
+                        <span>+$${(invoice.repairFees || 0).toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                    ${invoice.discountAmount > 0 ? `
+                    <div class="total-row">
+                        <span>Discount Applied</span>
+                        <span>-$${(invoice.discountAmount || 0).toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                    <div class="total-row">
+                        <span style="font-weight: 800; color: var(--text-primary);">Total Charged</span>
+                        <span class="grand-total">$${(invoice.totalAmount || 0).toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>Thank you for your valuable business with Rental ERP.</p>
+                <p style="font-size: 10px; margin-top: 5px; color: var(--text-secondary);">This generated report serves as an official invoice and contract verification under rental law.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`;
+
+        fs.writeFileSync(filePath, htmlContent, 'utf8');
+        return `/invoices/${fileName}`;
+    } catch (error) {
+        console.error('Error generating HTML invoice:', error);
+        throw error;
+    }
 };

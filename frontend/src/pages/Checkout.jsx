@@ -45,13 +45,8 @@ export const Checkout = () => {
             });
 
             if (res.data.success) {
-                const { order, pdfUrl } = res.data;
-
-
-                await api.post(`/rentals/${order._id}/sign-agreement`, { signature });
-
                 clearCart();
-                showToast('Order booked and paid successfully!', 'success');
+                showToast('Order booked successfully! Awaiting Partner Approval.', 'success');
                 navigate('/orders');
             }
         } catch (err) {

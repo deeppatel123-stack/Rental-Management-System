@@ -21,13 +21,13 @@ router.use(protect);
 router.get('/', getReturns);
 router.get('/:id', getReturnById);
 
-// Admin & Partner workflows
-router.put('/:id/assign', authorize('Super Admin', 'Rental Partner'), assignReturnExecutive);
-router.put('/:id/schedule', authorize('Super Admin', 'Rental Partner'), scheduleReturn);
-router.patch('/:id/status', authorize('Super Admin', 'Rental Partner'), updateReturnStatus);
-router.post('/:id/verify-otp', authorize('Super Admin', 'Rental Partner'), verifyReturnOtp);
-router.post('/:id/verify-qr', authorize('Super Admin', 'Rental Partner'), verifyReturnQr);
-router.post('/:id/start-inspection', authorize('Super Admin', 'Rental Partner'), startInspection);
-router.post('/:id/confirm', authorize('Super Admin', 'Rental Partner'), confirmReturn);
+// Partner actions only
+router.put('/:id/assign', authorize('Rental Partner'), assignReturnExecutive);
+router.put('/:id/schedule', authorize('Rental Partner'), scheduleReturn);
+router.patch('/:id/status', authorize('Rental Partner'), updateReturnStatus);
+router.post('/:id/verify-otp', authorize('Rental Partner'), verifyReturnOtp);
+router.post('/:id/verify-qr', authorize('Rental Partner'), verifyReturnQr);
+router.post('/:id/start-inspection', authorize('Rental Partner'), startInspection);
+router.post('/:id/confirm', authorize('Rental Partner'), confirmReturn);
 
 export default router;

@@ -258,7 +258,7 @@ export const ReturnWorkflow = () => {
 
     const confirmReturn = async (e) => {
         e.preventDefault();
-        if (!signatureTyped.trim()) return showToast('Customer signature required', 'warning');
+        const finalSignature = signatureTyped.trim() || 'Return E-Signed';
         setActionLoading(true);
         try {
             const updatedChecklist = checklistItems.map(item => ({
@@ -273,7 +273,7 @@ export const ReturnWorkflow = () => {
                 checklist: updatedChecklist,
                 notes: damageNotes || 'Return inspection completed.',
                 overallCondition,
-                customerSignature: signatureTyped
+                customerSignature: finalSignature
             });
             if (res.data.success) {
                 showToast('✅ Return completed! Rental closed.', 'success');
@@ -555,7 +555,7 @@ export const ReturnWorkflow = () => {
                                     )}
 
                                     {/* Step 6+: Full Inspection Form */}
-                                    {isAdmin && ['Inspection', 'Damage Review', 'Penalty Calculation', 'Refund Processing'].includes(selectedReturn.status) && (
+                                    {isAdmin && !['Completed', 'Cancelled'].includes(selectedReturn.status) && (
                                         <form onSubmit={confirmReturn} className="space-y-5">
                                             {/* Serial Number Scan */}
                                             <div className="glass-panel p-6 rounded-2xl border border-orange-500/15 space-y-4">
@@ -669,11 +669,23 @@ export const ReturnWorkflow = () => {
                                         <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-4">
                                             <div className="flex items-center gap-2 text-emerald-500"><CheckCircle2 className="w-6 h-6" /><h4 className="font-extrabold text-sm">Return Completed Successfully!</h4></div>
                                             <p className="text-xs text-slate-400">Inventory updated, deposit settled, and rental closed.</p>
-                                            <div className="grid grid-cols-2 gap-3 text-[11px] font-mono text-slate-400">
-                                                <div className="p-3 bg-slate-950/30 rounded-xl"><p className="text-[9px] text-slate-500 mb-1">RETURN DATE</p><p>{selectedReturn.actualReturnDate ? new Date(selectedReturn.actualReturnDate).toLocaleString() : 'N/A'}</p></div>
-                                                <div className="p-3 bg-slate-950/30 rounded-xl"><p className="text-[9px] text-slate-500 mb-1">LATE FEE</p><p>₹{selectedReturn.calculatedLateFee?.toFixed(2) || '0.00'}</p></div>
-                                                <div className="p-3 bg-slate-950/30 rounded-xl"><p className="text-[9px] text-slate-500 mb-1">DAMAGE COST</p><p>₹{selectedReturn.repairCostTotal?.toFixed(2) || '0.00'}</p></div>
-                                                <div className="p-3 bg-slate-950/30 rounded-xl"><p className="text-[9px] text-slate-500 mb-1">DEPOSIT REFUND</p><p className="text-emerald-400">₹{selectedReturn.depositRefundAmount?.toFixed(2) || '0.00'}</p></div>
+                                            <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                                                <div className="p-3 bg-slate-950/30 rounded-xl">
+                                                    <p className="text-[9px] text-white/50 mb-1 font-bold">RETURN DATE</p>
+                                                    <p className="text-white font-extrabold text-xs">{selectedReturn.actualReturnDate ? new Date(selectedReturn.actualReturnDate).toLocaleString() : 'N/A'}</p>
+                                                </div>
+                                                <div className="p-3 bg-slate-950/30 rounded-xl">
+                                                    <p className="text-[9px] text-white/50 mb-1 font-bold">LATE FEE</p>
+                                                    <p className="text-white font-extrabold text-xs">₹{selectedReturn.calculatedLateFee?.toFixed(2) || '0.00'}</p>
+                                                </div>
+                                                <div className="p-3 bg-slate-950/30 rounded-xl">
+                                                    <p className="text-[9px] text-white/50 mb-1 font-bold">DAMAGE COST</p>
+                                                    <p className="text-white font-extrabold text-xs">₹{selectedReturn.repairCostTotal?.toFixed(2) || '0.00'}</p>
+                                                </div>
+                                                <div className="p-3 bg-slate-950/30 rounded-xl">
+                                                    <p className="text-[9px] text-white/50 mb-1 font-bold">DEPOSIT REFUND</p>
+                                                    <p className="text-emerald-400 font-extrabold text-xs">₹{selectedReturn.depositRefundAmount?.toFixed(2) || '0.00'}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     )}

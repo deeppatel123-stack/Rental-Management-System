@@ -29,7 +29,6 @@ export const Sidebar = () => {
 
     const partnerLinks = [
         { label: 'Analytics Panel', path: '/partner', icon: Home },
-        { label: 'Manage Products', path: '/partner/products', icon: ShoppingBag },
         { label: 'Rental Contracts', path: '/partner/rentals', icon: CalendarRange },
         { label: 'Logistics Pickups', path: '/partner/pickups', icon: Truck },
         { label: 'Logistics Returns', path: '/partner/returns', icon: RotateCcw },
@@ -42,10 +41,6 @@ export const Sidebar = () => {
         { label: 'Manage Products', path: '/admin/products', icon: ShoppingBag },
         { label: 'Partner Directory', path: '/admin/partners', icon: Users },
         { label: 'Customer Directory', path: '/admin/customers', icon: UserCheck },
-        { label: 'Rental Contracts', path: '/admin/rentals', icon: CalendarRange },
-        { label: 'Logistics Pickups', path: '/admin/pickups', icon: Truck },
-        { label: 'Logistics Returns', path: '/admin/returns', icon: RotateCcw },
-        { label: 'Customer Tickets', path: '/admin/tickets', icon: LifeBuoy },
         { label: 'Enterprise Suite', path: '/admin/enterprise', icon: Cpu },
         { label: 'Business Settings', path: '/admin/settings', icon: Settings },
     ];

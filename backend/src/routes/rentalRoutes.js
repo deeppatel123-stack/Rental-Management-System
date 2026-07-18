@@ -15,20 +15,18 @@ import { authorize } from '../middleware/roleMiddleware.js';
 
 const router = express.Router();
 
-
-router.post('/quotation', createQuotation);
-
-
 router.use(protect);
-router.post('/checkout', createRentalOrder);
-router.get('/', getRentalOrders);
-router.get('/my-rentals', getRentalOrders);
-router.get('/:id', getRentalOrderById);
-router.post('/:id/sign-agreement', signAgreement);
-router.post('/:id/request-return', requestReturnAction);
-router.patch('/:id/status', authorize('Super Admin', 'Rental Partner'), updateOrderStatus);
-router.post('/:id/confirm-delivery', confirmDelivery);
-router.delete('/:id', deleteRentalOrder);
+
+router.post('/quotation', authorize('Rental Partner'), createQuotation);
+router.post('/checkout', authorize('Customer'), createRentalOrder);
+router.get('/', authorize('Super Admin', 'Rental Partner'), getRentalOrders);
+router.get('/my-rentals', authorize('Customer'), getRentalOrders);
+router.get('/:id', authorize('Super Admin', 'Rental Partner', 'Customer'), getRentalOrderById);
+router.post('/:id/sign-agreement', authorize('Customer'), signAgreement);
+router.post('/:id/request-return', authorize('Customer'), requestReturnAction);
+router.patch('/:id/status', authorize('Rental Partner'), updateOrderStatus);
+router.post('/:id/confirm-delivery', authorize('Customer'), confirmDelivery);
+router.delete('/:id', authorize('Customer'), deleteRentalOrder);
 
 
 export default router;

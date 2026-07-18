@@ -448,7 +448,7 @@ export const deleteRentalOrder = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
-        const ALLOWED = ['Pending', 'Confirmed', 'Active', 'Delivered', 'Overdue', 'Cancelled'];
+        const ALLOWED = ['Pending', 'Confirmed', 'Ready for Pickup', 'Active', 'Return Requested', 'Completed', 'Overdue', 'Cancelled'];
         if (!ALLOWED.includes(status)) {
             return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${ALLOWED.join(', ')}` });
         }
@@ -463,13 +463,12 @@ export const updateOrderStatus = async (req, res, next) => {
 
         if (status === 'Confirmed') {
             await triggerEvent('RentalApproved', { orderId: order._id, userId: req.user.id });
-            if (order.customerSignature) {
-                await triggerEvent('ContractSigned', { orderId: order._id, userId: req.user.id, extraData: { signature: order.customerSignature } });
-                await triggerEvent('PaymentCompleted', { orderId: order._id, userId: req.user.id });
-            }
+        } else if (status === 'Ready for Pickup') {
+            await triggerEvent('ContractSigned', { orderId: order._id, userId: req.user.id, extraData: { signature: order.customerSignature || 'E-Signed' } });
+            await triggerEvent('PaymentCompleted', { orderId: order._id, userId: req.user.id });
         } else if (status === 'Active') {
             await triggerEvent('PickupCompleted', { orderId: order._id, userId: req.user.id });
-        } else if (status === 'Delivered') {
+        } else if (status === 'Completed') {
             await triggerEvent('ReturnCompleted', { orderId: order._id, userId: req.user.id, extraData: { inspectionData: { overallCondition: 'Excellent' } } });
         } else if (status === 'Cancelled') {
             await triggerEvent('OrderCancelled', { orderId: order._id, userId: req.user.id });

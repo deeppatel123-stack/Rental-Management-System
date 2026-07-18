@@ -10,6 +10,7 @@ import RepairTicket from '../models/RepairTicket.js';
 import User from '../models/User.js';
 import Product from '../models/Product.js';
 import { generateQRCode } from '../services/qrService.js';
+import { triggerEvent } from '../services/eventService.js';
 
 // ─────────────────────────────────────────────
 // GET ALL RETURNS (role-filtered)
@@ -106,7 +107,7 @@ export const assignReturnExecutive = async (req, res, next) => {
             user: returnDoc.customer,
             title: '🔄 Return Executive Assigned',
             message: `${executive?.name || 'Our executive'} has been assigned to collect your rental return.`,
-            type: 'Order',
+            type: 'Rental',
             referenceId: returnDoc.rentalOrder._id || returnDoc.rentalOrder
         });
 
@@ -170,7 +171,7 @@ export const scheduleReturn = async (req, res, next) => {
             user: returnDoc.customer,
             title: '📅 Return Scheduled',
             message: `Your return is scheduled for ${new Date(scheduledDate).toLocaleString()}. Your Return OTP: ${returnDoc.otp}.`,
-            type: 'Order',
+            type: 'Rental',
             referenceId: returnDoc.rentalOrder._id || returnDoc.rentalOrder
         });
 
@@ -212,7 +213,7 @@ export const updateReturnStatus = async (req, res, next) => {
             user: returnDoc.customer,
             title: `🔄 Return Status: ${status}`,
             message: notes || `Your return status has been updated to: ${status}`,
-            type: 'Order',
+            type: 'Rental',
             referenceId: returnDoc.rentalOrder._id || returnDoc.rentalOrder
         });
 
@@ -340,13 +341,8 @@ export const confirmReturn = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized partner access' });
         }
 
-        // Must be in inspection phase
-        if (!['Inspection', 'Damage Review', 'Penalty Calculation', 'Refund Processing', 'OTP Verified'].includes(returnDoc.status)) {
-            return res.status(400).json({ success: false, message: 'Return must be in Inspection phase to confirm.' });
-        }
-
         if (!returnDoc.isOtpVerified && !returnDoc.qrScanned) {
-            returnDoc.isOtpVerified = true; // allow if executive confirmed manually
+            returnDoc.isOtpVerified = true;
         }
 
         const order = await RentalOrder.findById(returnDoc.rentalOrder._id || returnDoc.rentalOrder);
@@ -411,162 +407,43 @@ export const confirmReturn = async (req, res, next) => {
         returnDoc.requiresRepair = requiresRepair;
         returnDoc.repairCostTotal = totalDamageCost;
 
-        // Timeline updates for each stage
+        // Timeline updates for return record
         returnDoc.timeline.push({ status: 'Damage Review', notes: `Damage assessment complete. Total: $${totalDamageCost}`, updatedBy: req.user.id });
         returnDoc.timeline.push({ status: 'Penalty Calculation', notes: `Late fee: $${lateFee.toFixed(2)} (${lateHours}hrs late)`, updatedBy: req.user.id });
         returnDoc.timeline.push({ status: 'Refund Processing', notes: 'Calculating deposit refund...', updatedBy: req.user.id });
 
-        // ── 3. DEPOSIT SETTLEMENT & REFUND ENGINE ──
         const penaltyTotal = lateFee + totalDamageCost;
-        const depositLog = await Deposit.findOne({ rentalOrder: order._id });
+        const refundAmount = Math.max(0, order.securityDepositTotal - penaltyTotal);
 
-        if (depositLog) {
-            const initialHold = depositLog.amountHeld;
-            const finalRefund = Math.max(0, initialHold - penaltyTotal);
-            const finalDeduction = Math.min(initialHold, penaltyTotal);
-
-            depositLog.penaltyDeducted = penaltyTotal;
-            depositLog.amountRefunded = finalRefund;
-            depositLog.status = penaltyTotal === 0 ? 'Refunded' : (finalRefund > 0 ? 'Partially Refunded' : 'Deducted/Settled');
-            depositLog.refundedAt = now;
-            depositLog.deductionNotes = `Late Fee: $${lateFee.toFixed(2)}, Damage/Lost: $${totalDamageCost.toFixed(2)}`;
-            depositLog.refundTransactionId = `REF-${Math.floor(10000000 + Math.random() * 90000000)}`;
-            await depositLog.save();
-
-            order.depositStatus = depositLog.status;
-            returnDoc.depositRefundAmount = finalRefund;
-            returnDoc.depositDeductionAmount = finalDeduction;
-        }
+        returnDoc.depositRefundAmount = refundAmount;
+        returnDoc.depositDeductionAmount = Math.min(order.securityDepositTotal, penaltyTotal);
 
         returnDoc.status = 'Completed';
         returnDoc.timeline.push({
             status: 'Completed',
-            notes: `Return fully settled. Late fee: $${lateFee.toFixed(2)}, Damage: $${totalDamageCost.toFixed(2)}, Penalty total: $${penaltyTotal.toFixed(2)}`,
+            notes: `Return fully settled via Event system. Late fee: $${lateFee.toFixed(2)}, Damage: $${totalDamageCost.toFixed(2)}, Penalty total: $${penaltyTotal.toFixed(2)}`,
             updatedBy: req.user.id
         });
         await returnDoc.save();
 
-        // ── 4. UPDATE ORDER STATUS ──
-        order.lateFees = lateFee;
-        order.actualReturnDate = now;
-        order.status = 'Delivered';
-        order.timeline.push({
-            status: 'Delivered',
-            description: `Return completed. Penalty: $${penaltyTotal.toFixed(2)}. Deposit settlement done.`,
-            updatedBy: req.user.id
+        // ── 3. EXECUTE EVENT TRANSITION ──
+        // This will update the Master RentalOrder status, Timeline, Inventory available/maintenance stock counters,
+        // update Deposit balances, trigger Penalty Invoices, create RepairTickets, and send notifications.
+        const inspectionData = {
+            isLateReturn: isLate,
+            lateHours,
+            lateFeeCalculated: lateFee,
+            requiresRepair,
+            repairCost: totalDamageCost,
+            overallCondition: overallCondition || 'Excellent',
+            checkListResults: checklistData
+        };
+
+        await triggerEvent('ReturnCompleted', {
+            orderId: order._id,
+            userId: req.user.id,
+            extraData: { inspectionData }
         });
-        await order.save();
-
-        // ── 5. INVENTORY SYNCHRONIZATION ──
-        for (const item of checklistData) {
-            if (item.serialNumber) {
-                const physicalUnit = await Inventory.findOne({ serialNumber: item.serialNumber }).populate('product');
-                if (physicalUnit) {
-                    const productDoc = physicalUnit.product;
-
-                    if (item.status === 'Returned') {
-                        physicalUnit.status = 'Available';
-                        physicalUnit.condition = item.conditionRating || 'Good';
-                        physicalUnit.movementHistory.push({
-                            action: 'Return Completed - Available',
-                            performedBy: req.user.id,
-                            notes: 'Clean return. Stock restored to Available.'
-                        });
-                        if (productDoc) {
-                            productDoc.stock.available += 1;
-                            await productDoc.save();
-                        }
-                    } else if (item.status === 'Damaged') {
-                        physicalUnit.status = 'Maintenance';
-                        physicalUnit.condition = 'Damaged';
-                        physicalUnit.movementHistory.push({
-                            action: 'Return - Moved to Maintenance',
-                            performedBy: req.user.id,
-                            notes: `Returned damaged. Repair cost: $${item.damageCost || 0}. ${item.damageDescription || ''}`
-                        });
-                        if (productDoc) {
-                            productDoc.stock.maintenance += 1;
-                            await productDoc.save();
-                        }
-                        // Create Repair Ticket
-                        if (productDoc) {
-                            const ticketNum = `TKT-${Date.now().toString().slice(-7)}`;
-                            await RepairTicket.create({
-                                ticketNumber: ticketNum,
-                                inventoryItem: physicalUnit._id,
-                                rentalOrder: returnDoc.rentalOrder._id || returnDoc.rentalOrder,
-                                reportedBy: req.user.id,
-                                description: item.damageDescription || 'Returned damaged during return inspection',
-                                costEstimate: item.damageCost || 0,
-                                status: 'Inspection',
-                                severity: item.damageCost > 5000 ? 'Critical' : item.damageCost > 1000 ? 'High' : 'Medium'
-                            });
-                        }
-                    } else if (item.status === 'Lost') {
-                        physicalUnit.status = 'Lost';
-                        physicalUnit.condition = 'Damaged';
-                        physicalUnit.movementHistory.push({
-                            action: 'Marked Lost',
-                            performedBy: req.user.id,
-                            notes: 'Confirmed lost by executive during return inspection'
-                        });
-                        if (productDoc) {
-                            productDoc.stock.damaged += 1;
-                            productDoc.stock.total = Math.max(0, productDoc.stock.total - 1);
-                            await productDoc.save();
-                        }
-                    }
-                    await physicalUnit.save();
-                }
-            }
-        }
-
-        // Also reduce rented count on products for items that were rented
-        for (const orderItem of order.items) {
-            if (orderItem.inventoryItem) {
-                const unit = await Inventory.findById(orderItem.inventoryItem);
-                if (unit && unit.status === 'Rented') {
-                    // will be updated by serial scan above; if not matched, just mark available
-                }
-            }
-        }
-
-        // ── 6. PENALTY INVOICE ──
-        if (penaltyTotal > 0) {
-            const hex = Math.floor(1000 + Date.now() % 9000);
-            await Invoice.create({
-                invoiceNumber: `INV-PEN-${hex}`,
-                rentalOrder: order._id,
-                customer: order.customer,
-                invoiceType: 'Overdue Penalty',
-                subTotal: penaltyTotal,
-                taxAmount: 0,
-                lateFees: lateFee,
-                repairFees: totalDamageCost,
-                totalAmount: penaltyTotal,
-                paymentStatus: 'Paid'
-            });
-        }
-
-        // ── 7. NOTIFICATIONS ──
-        await Notification.create({
-            user: order.customer,
-            title: '✅ Rental Return Completed',
-            message: `Rental #${order.orderNumber} closed. Penalty deductions: $${penaltyTotal.toFixed(2)}. ${depositLog ? `Deposit refund: $${returnDoc.depositRefundAmount?.toFixed(2)}` : ''}`,
-            type: 'Deposit',
-            referenceId: order._id
-        });
-
-        const admins = await User.find({ role: 'Super Admin' }).select('_id');
-        for (const admin of admins) {
-            await Notification.create({
-                user: admin._id,
-                title: '🔄 Return Completed',
-                message: `Order #${order.orderNumber} return finalized. Penalty: $${penaltyTotal.toFixed(2)}`,
-                type: 'Order',
-                referenceId: order._id
-            });
-        }
 
         await ActivityLog.create({
             user: req.user.id,
@@ -575,16 +452,17 @@ export const confirmReturn = async (req, res, next) => {
             details: `Return completed for Order #${order.orderNumber}. Late fee: $${lateFee.toFixed(2)}, Damage: $${totalDamageCost.toFixed(2)}`
         });
 
+        const updatedOrder = await RentalOrder.findById(order._id);
         res.json({
             success: true,
             message: `Return completed for Order #${order.orderNumber}. Penalty: $${penaltyTotal.toFixed(2)}.`,
             returnDoc,
-            order,
+            order: updatedOrder,
             summary: {
                 lateFee,
                 damageCost: totalDamageCost,
                 penaltyTotal,
-                depositRefund: returnDoc.depositRefundAmount || 0
+                depositRefund: refundAmount
             }
         });
     } catch (error) {

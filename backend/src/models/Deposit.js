@@ -10,8 +10,8 @@ const DepositSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['Held', 'Processing', 'Refunded', 'Partially Refunded', 'Deducted/Settled'],
-        default: 'Held',
+        enum: ['Not Collected', 'Held', 'Processing', 'Refunded', 'Partially Refunded', 'Deducted/Settled'],
+        default: 'Not Collected',
         index: true
     },
 

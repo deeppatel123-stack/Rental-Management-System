@@ -19,11 +19,11 @@ router.use(protect);
 router.get('/', getPickups);
 router.get('/:id', getPickupById);
 
-// Admin & Partner workflows
-router.put('/:id/assign', authorize('Super Admin', 'Rental Partner'), assignPickup);
-router.put('/:id/schedule', authorize('Super Admin', 'Rental Partner'), schedulePickup);
-router.patch('/:id/status', authorize('Super Admin', 'Rental Partner'), updatePickupStatus);
-router.post('/:id/verify', authorize('Super Admin', 'Rental Partner'), verifyPickupCode);
-router.post('/:id/confirm', authorize('Super Admin', 'Rental Partner'), confirmPickup);
+// Partner workflows only
+router.put('/:id/assign', authorize('Rental Partner'), assignPickup);
+router.put('/:id/schedule', authorize('Rental Partner'), schedulePickup);
+router.patch('/:id/status', authorize('Rental Partner'), updatePickupStatus);
+router.post('/:id/verify', authorize('Rental Partner'), verifyPickupCode);
+router.post('/:id/confirm', authorize('Rental Partner'), confirmPickup);
 
 export default router;

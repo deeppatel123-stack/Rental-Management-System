@@ -9,9 +9,15 @@ import {
 export const EnterpriseSuite = () => {
     const { showToast } = useToast();
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('ai');
+    const [activeTab, setActiveTab] = useState(user?.role === 'Super Admin' ? 'ai' : 'quotations');
     const [loading, setLoading] = useState(false);
     const [staffReports, setStaffReports] = useState([]);
+
+    useEffect(() => {
+        if (user?.role) {
+            setActiveTab(user.role === 'Super Admin' ? 'ai' : 'quotations');
+        }
+    }, [user?.role]);
 
     // Dynamic Lists from Backend
     const [quotes, setQuotes] = useState([]);
@@ -228,29 +234,31 @@ export const EnterpriseSuite = () => {
             {/* Sub-menu modules selection */}
             <div className="flex gap-2 pb-2 overflow-x-auto border-b border-slate-200 dark:border-slate-800 scrollbar-none">
                 {[
-                    { id: 'ai', label: 'AI Predict & KPI', icon: Cpu },
-                    { id: 'quotations', label: 'Quotation Engine', icon: FileText },
-                    { id: 'calendars', label: 'Asset Calendars', icon: Calendar },
-                    { id: 'inventory', label: 'Variants & QR', icon: Box },
-                    { id: 'deposits', label: 'Deposit Ledgers', icon: DollarSign },
-                    { id: 'logistics', label: 'Routing & Logistics', icon: Truck },
-                    { id: 'repairs', label: 'Inspections & Repairs', icon: Wrench },
-                    { id: 'coupons', label: 'Promo Coupons', icon: Tag },
-                    { id: 'audit', label: 'Compliance Audit', icon: Activity },
-                    ...(user?.role === 'Super Admin' ? [{ id: 'reports', label: 'Partner Reports', icon: User }] : [])
-                ].map(t => (
-                    <button
-                        key={t.id}
-                        onClick={() => setActiveTab(t.id)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex-shrink-0 cursor-pointer min-w-max ${activeTab === t.id
-                            ? 'bg-brand-500 text-white shadow-md shadow-brand-500/10'
-                            : 'bg-white dark:bg-slate-900 border border-slate-205 dark:border-slate-800 text-slate-450 hover:text-brand-500'
-                            }`}
-                    >
-                        <t.icon className="w-4 h-4" />
-                        {t.label}
-                    </button>
-                ))}
+                    { id: 'ai', label: 'AI Predict & KPI', icon: Cpu, roles: ['Super Admin'] },
+                    { id: 'quotations', label: 'Quotation Engine', icon: FileText, roles: ['Rental Partner'] },
+                    { id: 'calendars', label: 'Asset Calendars', icon: Calendar, roles: ['Rental Partner'] },
+                    { id: 'inventory', label: 'Variants & QR', icon: Box, roles: ['Rental Partner'] },
+                    { id: 'deposits', label: 'Deposit Ledgers', icon: DollarSign, roles: ['Rental Partner'] },
+                    { id: 'logistics', label: 'Routing & Logistics', icon: Truck, roles: ['Rental Partner'] },
+                    { id: 'repairs', label: 'Inspections & Repairs', icon: Wrench, roles: ['Rental Partner'] },
+                    { id: 'coupons', label: 'Promo Coupons', icon: Tag, roles: ['Super Admin'] },
+                    { id: 'audit', label: 'Compliance Audit', icon: Activity, roles: ['Super Admin'] },
+                    ...(user?.role === 'Super Admin' ? [{ id: 'reports', label: 'Partner Reports', icon: User, roles: ['Super Admin'] }] : [])
+                ]
+                    .filter(t => t.roles.includes(user?.role))
+                    .map(t => (
+                        <button
+                            key={t.id}
+                            onClick={() => setActiveTab(t.id)}
+                            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex-shrink-0 cursor-pointer min-w-max ${activeTab === t.id
+                                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/10'
+                                : 'bg-white dark:bg-slate-900 border border-slate-205 dark:border-slate-800 text-slate-450 hover:text-brand-500'
+                                }`}
+                        >
+                            <t.icon className="w-4 h-4" />
+                            {t.label}
+                        </button>
+                    ))}
             </div>
 
             {/* Layout Loading State */}

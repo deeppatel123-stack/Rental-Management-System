@@ -156,9 +156,10 @@ export const triggerEvent = async (eventName, payload) => {
                 // If payment is successful
                 order.paymentStatus = 'Paid';
                 order.depositStatus = 'Held';
+                order.status = 'Ready for Pickup';
                 order.timeline.push({
-                    status: 'Payment Completed',
-                    description: 'Rental fee payment confirmed and security deposit holds activated.',
+                    status: 'Ready for Pickup',
+                    description: 'Rental fee payment confirmed and security deposit holds activated. Order is ready for pickup!',
                     updatedBy: userId
                 });
                 await order.save();
@@ -304,12 +305,11 @@ export const triggerEvent = async (eventName, payload) => {
                 }
                 break;
             }
-
             case 'ReturnCompleted': {
                 const { inspectionData } = extraData || {};
 
-                // Update Order status to Delivered (Returned/Closed workflow)
-                order.status = 'Delivered';
+                // Update Order status to Completed
+                order.status = 'Completed';
                 order.actualReturnDate = new Date();
 
                 const { isLateReturn, lateHours, lateFeeCalculated, requiresRepair, repairCost, overallCondition, checkListResults } = inspectionData || {};
@@ -347,6 +347,21 @@ export const triggerEvent = async (eventName, payload) => {
                                 notes: `Returned. Inspection condition: ${overallCondition || 'Excellent'}. Rental order #${order.orderNumber}`
                             });
                             await invUnit.save();
+
+                            // Generate Repair Ticket if unit is damaged
+                            if (overallCondition === 'Damaged' || requiresRepair) {
+                                const ticketNum = `TKT-${Date.now().toString().slice(-7)}`;
+                                await RepairTicket.create({
+                                    ticketNumber: ticketNum,
+                                    inventoryItem: invUnit._id,
+                                    rentalOrder: order._id,
+                                    reportedBy: userId,
+                                    description: 'Returned damaged during inspection checks.',
+                                    costEstimate: repairCost || 0,
+                                    status: 'Inspection',
+                                    severity: (repairCost || 0) > 5000 ? 'Critical' : (repairCost || 0) > 1000 ? 'High' : 'Medium'
+                                });
+                            }
                         }
                     }
                 }
@@ -370,7 +385,7 @@ export const triggerEvent = async (eventName, payload) => {
                 }
 
                 order.timeline.push({
-                    status: 'Delivered',
+                    status: 'Completed',
                     description: `Return processed. Penalty: $${penaltyTotal.toFixed(2)}, Refund processed: $${refundAmount.toFixed(2)}.`,
                     updatedBy: userId
                 });
@@ -385,6 +400,23 @@ export const triggerEvent = async (eventName, payload) => {
                     await depositObj.save();
                 }
 
+                // Generate Penalty Invoice if penalty fees exist
+                if (penaltyTotal > 0) {
+                    const hex = Math.floor(1000 + Date.now() % 9000);
+                    await Invoice.create({
+                        invoiceNumber: `INV-PEN-${hex}`,
+                        rentalOrder: order._id,
+                        customer: order.customer._id,
+                        invoiceType: 'Overdue Penalty',
+                        subTotal: penaltyTotal,
+                        taxAmount: 0,
+                        lateFees: lateFeeCalculated || 0,
+                        repairFees: repairCost || 0,
+                        totalAmount: penaltyTotal,
+                        paymentStatus: 'Paid'
+                    });
+                }
+
                 // Notify Customer
                 await sendNotification(
                     order.customer._id,
@@ -395,7 +427,7 @@ export const triggerEvent = async (eventName, payload) => {
                 );
 
                 if (io) {
-                    io.emit('order_refreshed', { orderId: order._id, status: 'Delivered' });
+                    io.emit('order_refreshed', { orderId: order._id, status: 'Completed' });
                 }
                 break;
             }

@@ -116,8 +116,48 @@ export const Login = () => {
                     </button>
                 </form>
 
+                <div className="relative my-4 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
+                    </div>
+                    <span className="relative px-3 text-[10px] uppercase font-bold text-slate-400 bg-white dark:bg-[#0c204000] backdrop-blur-xl">Quick Demo Login</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEmail('bhaumikkothiya1@gmail.com');
+                            setPassword('Bhaumik@1910');
+                        }}
+                        className="py-2.5 px-2 bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 text-red-500 dark:text-red-400 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider"
+                    >
+                        Admin
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEmail('deepp0261@gmail.com');
+                            setPassword('Deep@123');
+                        }}
+                        className="py-2.5 px-2 bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-indigo-500 dark:text-indigo-400 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider"
+                    >
+                        Partner
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEmail('deepp0203@gmail.com');
+                            setPassword('Deep@123');
+                        }}
+                        className="py-2.5 px-2 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider"
+                    >
+                        Customer
+                    </button>
+                </div>
+
                 <div className="text-center">
-                    <span className="text-xs text-slate-400">Need an account? </span>
+                    <span className="text-xs text-slate-450">Need an account? </span>
                     <Link to="/signup" className="text-xs font-bold text-brand-500 hover:underline">
                         Register Portal User
                     </Link>

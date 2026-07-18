@@ -53,7 +53,7 @@ const RentalOrderSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['Pending', 'Quotation', 'Confirmed', 'Picked Up', 'Active', 'Return Requested', 'Overdue', 'Delivered', 'Cancelled'],
+        enum: ['Pending', 'Quotation', 'Confirmed', 'Ready for Pickup', 'Picked Up', 'Active', 'Return Requested', 'Overdue', 'Delivered', 'Completed', 'Cancelled'],
         default: 'Pending',
         index: true
     },

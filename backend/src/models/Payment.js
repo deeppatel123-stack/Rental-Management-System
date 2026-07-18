@@ -9,7 +9,7 @@ const PaymentSchema = new mongoose.Schema({
     currency: { type: String, default: 'USD' },
     paymentMethod: { type: String, enum: ['Card', 'PayPal', 'Stripe', 'UPI', 'Cash'], default: 'Card' },
     transactionId: { type: String, unique: true, index: true },
-    status: { type: String, enum: ['Pending', 'Completed', 'Refunded', 'Failed'], default: 'Pending' },
+    status: { type: String, enum: ['Pending', 'Unpaid', 'Completed', 'Refunded', 'Failed'], default: 'Pending' },
 
     gatewayResponse: mongoose.Schema.Types.Mixed,
     createdAt: { type: Date, default: Date.now }
