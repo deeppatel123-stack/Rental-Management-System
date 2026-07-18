@@ -77,7 +77,7 @@ export const getProductById = async (req, res, next) => {
 
 export const createProduct = async (req, res, next) => {
     try {
-        const { name, sku, category, brand, manufacturer, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, depositType, depositValue, totalStock, specifications, accessories, variants } = req.body;
+        const { name, sku, category, brand, manufacturer, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, depositType, depositValue, taxRate, totalStock, specifications, accessories, variants } = req.body;
 
         const productExists = await Product.findOne({ sku });
         if (productExists) {
@@ -133,6 +133,7 @@ export const createProduct = async (req, res, next) => {
             securityDeposit,
             depositType,
             depositValue,
+            taxRate: taxRate !== undefined ? Number(taxRate) : 8,
             stock: {
                 total: totalStock || 1,
                 available: totalStock || 1,
@@ -187,13 +188,14 @@ export const updateProduct = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized: You do not own this product' });
         }
 
-        const { name, category, brand, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, totalStock } = req.body;
+        const { name, category, brand, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, totalStock, taxRate } = req.body;
 
         if (name) product.name = name;
         if (category) product.category = category;
         if (brand) product.brand = brand;
         if (description) product.description = description;
         if (securityDeposit) product.securityDeposit = securityDeposit;
+        if (taxRate !== undefined) product.taxRate = Number(taxRate);
 
         const rateDaily = dailyPrice || req.body.priceRate?.daily;
         const rateWeekly = weeklyPrice || req.body.priceRate?.weekly;

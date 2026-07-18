@@ -23,6 +23,46 @@ export const Checkout = () => {
     const [cvc, setCvc] = useState('123');
     const [loading, setLoading] = useState(false);
 
+    // Coupon campaign state setup
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponError, setCouponError] = useState('');
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode) return;
+        setCouponError('');
+        try {
+            const res = await api.post('/enterprise/coupons/validate', {
+                code: couponCode,
+                cartAmount: totals.subTotal
+            });
+            if (res.data?.success) {
+                setAppliedCoupon({
+                    code: couponCode.toUpperCase(),
+                    discount: res.data.discount
+                });
+                showToast(res.data.message || 'Coupon applied!', 'success');
+            }
+        } catch (err) {
+            setCouponError(err.response?.data?.message || 'Invalid coupon.');
+            setAppliedCoupon(null);
+            showToast(err.response?.data?.message || 'Invalid coupon.', 'error');
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponCode('');
+        setCouponError('');
+    };
+
+    const discountAmount = appliedCoupon ? appliedCoupon.discount : 0;
+    const finalSubtotal = Math.max(0, totals.subTotal - discountAmount);
+    const finalTax = totals.subTotal > 0
+        ? Math.round(((finalSubtotal / totals.subTotal) * (totals.preDiscountTax || totals.tax)) * 100) / 100
+        : 0;
+    const finalGrandTotal = finalSubtotal + finalTax + totals.securityHold;
+
     const handlePayAndConfirm = async (e) => {
         e.preventDefault();
         if (!agreePolicy) return showToast('Agree to rental policies and sign terms first.', 'error');
@@ -41,7 +81,8 @@ export const Checkout = () => {
                 endDate,
                 deliveryType,
                 shippingAddress,
-                paymentMethod
+                paymentMethod,
+                couponCode: appliedCoupon ? appliedCoupon.code : undefined
             });
 
             if (res.data.success) {
@@ -171,10 +212,66 @@ export const Checkout = () => {
                         </div>
 
 
+                        {/* Coupon Code Section */}
+                        <div className="border-t border-slate-200/50 dark:border-slate-800/10 pt-4 space-y-3">
+                            <span className="text-[10px] text-slate-450 dark:text-slate-400 font-bold uppercase tracking-wider">Promotional Discount Coupon</span>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={couponCode}
+                                    onChange={(e) => setCouponCode(e.target.value)}
+                                    placeholder="Enter Coupon Code (e.g. WELCOME10)"
+                                    disabled={appliedCoupon}
+                                    className="flex-1 glass-input text-xs uppercase"
+                                />
+                                {appliedCoupon ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleRemoveCoupon}
+                                        className="px-3 py-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-semibold rounded-xl"
+                                    >
+                                        Remove
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleApplyCoupon}
+                                        className="px-4 py-2 bg-brand-500 text-white hover:bg-brand-600 text-xs font-semibold rounded-xl"
+                                    >
+                                        Apply
+                                    </button>
+                                )}
+                            </div>
+                            {couponError && (
+                                <p className="text-[10px] text-rose-500 font-semibold">{couponError}</p>
+                            )}
+                            {appliedCoupon && (
+                                <p className="text-[10px] text-emerald-500 font-semibold">✓ Coupon {appliedCoupon.code} applied! Saved ${appliedCoupon.discount.toFixed(2)}</p>
+                            )}
+                        </div>
+
                         <div className="border-t border-slate-200/50 dark:border-slate-800/10 pt-4 space-y-2 text-xs">
-                            <div className="flex justify-between font-semibold text-slate-600 dark:text-slate-400">
+                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                <span>Subtotal:</span>
+                                <span className="font-semibold text-slate-900 dark:text-white">${totals.subTotal.toFixed(2)}</span>
+                            </div>
+                            {discountAmount > 0 && (
+                                <div className="flex justify-between text-emerald-500 font-semibold">
+                                    <span>Discount Applied:</span>
+                                    <span>-${discountAmount.toFixed(2)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                <span>Estimated Tax:</span>
+                                <span className="font-semibold text-slate-900 dark:text-white">${finalTax.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                <span>Security Deposit (Refundable):</span>
+                                <span className="font-semibold text-slate-900 dark:text-white">${totals.securityHold.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-slate-900 dark:text-white text-sm pt-2 border-t border-slate-250/20">
                                 <span>Total checkout hold:</span>
-                                <span className="text-slate-900 dark:text-white">${totals.grandTotal.toFixed(2)}</span>
+                                <span className="text-emerald-600 dark:text-emerald-400">${finalGrandTotal.toFixed(2)}</span>
                             </div>
                             <p className="text-[9px] text-slate-400 leading-normal text-center">
                                 Your card will be immediately held for subtotal+taxes and the temporary security hold deposit balance.
@@ -187,7 +284,7 @@ export const Checkout = () => {
                             className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-md text-xs uppercase flex items-center justify-center gap-1.5"
                         >
                             <ShieldCheck className="w-5 h-5" />
-                            {loading ? 'Processing transaction holds...' : `Authorize Charge: $${totals.grandTotal.toFixed(2)}`}
+                            {loading ? 'Processing transaction holds...' : `Authorize Charge: $${finalGrandTotal.toFixed(2)}`}
                         </button>
                     </div>
                 </div>

@@ -46,6 +46,7 @@ export const CartProvider = ({ children }) => {
                 name: product.name,
                 dailyRate: product.priceRate.daily,
                 securityDeposit: product.securityDeposit,
+                taxRate: product.taxRate !== undefined ? product.taxRate : 8,
                 image: product.images[0] || '',
                 ownerId: product.ownerId,
                 ownerName: product.ownerName || 'Rental Desk',
@@ -81,14 +82,18 @@ export const CartProvider = ({ children }) => {
         const days = getDaysCount();
         let subTotal = 0;
         let securityHold = 0;
+        let preDiscountTax = 0;
 
         cartItems.forEach(item => {
-            subTotal += item.dailyRate * days * item.quantity;
+            const itemSub = item.dailyRate * days * item.quantity;
+            subTotal += itemSub;
             securityHold += item.securityDeposit * item.quantity;
+            const ratesTax = item.taxRate !== undefined ? item.taxRate : 8;
+            preDiscountTax += (itemSub * ratesTax) / 100;
         });
 
 
-        const tax = Math.round((subTotal * 0.08) * 100) / 100;
+        const tax = Math.round(preDiscountTax * 100) / 100;
         const grandTotal = subTotal + tax + securityHold;
 
         return {
@@ -96,6 +101,7 @@ export const CartProvider = ({ children }) => {
             subTotal,
             securityHold,
             tax,
+            preDiscountTax: tax,
             grandTotal
         };
     })();

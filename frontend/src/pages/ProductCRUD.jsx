@@ -22,6 +22,7 @@ export const ProductCRUD = () => {
     const [description, setDescription] = useState('');
     const [specStr, setSpecStr] = useState('');
     const [totalStock, setTotalStock] = useState(1);
+    const [taxRate, setTaxRate] = useState(8);
     const [imageFiles, setImageFiles] = useState([]);
 
     const fetchCatalog = async () => {
@@ -63,6 +64,7 @@ export const ProductCRUD = () => {
         setDescription('');
         setSpecStr('');
         setTotalStock(1);
+        setTaxRate(8);
         setImageFiles([]);
         setShowModal(true);
     };
@@ -76,6 +78,7 @@ export const ProductCRUD = () => {
         setDaily(prod.priceRate.daily);
         setWeekly(prod.priceRate.weekly || 250);
         setDeposit(prod.securityDeposit);
+        setTaxRate(prod.taxRate !== undefined ? prod.taxRate : 8);
         setDescription(prod.description);
         setTotalStock(prod.stock?.total || 1);
         setImageFiles([]);
@@ -104,6 +107,7 @@ export const ProductCRUD = () => {
         formData.append('dailyPrice', daily);
         formData.append('weeklyPrice', weekly);
         formData.append('securityDeposit', deposit);
+        formData.append('taxRate', taxRate);
         formData.append('description', description);
         formData.append('totalStock', totalStock);
         formData.append('specifications', JSON.stringify(specsArray));
@@ -224,7 +228,7 @@ export const ProductCRUD = () => {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 15 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        className="w-full max-w-lg bg-white/90 dark:bg-slate-900/90 glass-panel p-6 rounded-[2rem] shadow-2xl relative z-50 max-h-[90vh] overflow-y-auto space-y-6 scrollbar-none border border-slate-205 dark:border-slate-800/10"
+                        className="w-full max-w-xl bg-white/90 dark:bg-slate-900/90 glass-panel p-6 rounded-[2rem] shadow-2xl relative z-50 max-h-[90vh] overflow-y-auto space-y-6 scrollbar-none border border-slate-205 dark:border-slate-800/10"
                     >
                         <div className="flex justify-between items-center border-b border-slate-205 dark:border-slate-850 pb-3">
                             <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
@@ -296,46 +300,69 @@ export const ProductCRUD = () => {
                             {/* Section 2: Pricing & Stock Structure */}
                             <div className="space-y-4">
                                 <h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">Prices Matrix & Stock Criteria</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                                    <div className="space-y-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="flex flex-col justify-between h-full space-y-1">
                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Daily Rate ($) *</label>
                                         <input
                                             type="number"
+                                            step="0.01"
                                             value={daily}
-                                            onChange={(e) => setDaily(Number(e.target.value))}
+                                            onChange={(e) => setDaily(e.target.value)}
+                                            placeholder="0.00"
                                             className="w-full glass-input text-xs font-bold"
                                             required
                                             min={0}
                                         />
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="flex flex-col justify-between h-full space-y-1">
                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Weekly Rate ($) *</label>
                                         <input
                                             type="number"
+                                            step="0.01"
                                             value={weekly}
-                                            onChange={(e) => setWeekly(Number(e.target.value))}
+                                            onChange={(e) => setWeekly(e.target.value)}
+                                            placeholder="0.00"
                                             className="w-full glass-input text-xs"
                                             required
                                             min={0}
                                         />
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="flex flex-col justify-between h-full space-y-1">
                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Escrow Hold ($) *</label>
                                         <input
                                             type="number"
+                                            step="0.01"
                                             value={deposit}
-                                            onChange={(e) => setDeposit(Number(e.target.value))}
-                                            className="w-full glass-input text-xs font-bold text-emerald-600 dark:text-emerald-400"
+                                            onChange={(e) => setDeposit(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full glass-input text-xs font-bold text-emerald-600 dark:text-emerald-405"
                                             required
                                             min={0}
                                         />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Stock level *</label>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="flex flex-col justify-between h-full space-y-1">
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Tax Rate (%) *</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={taxRate}
+                                            onChange={(e) => setTaxRate(e.target.value)}
+                                            placeholder="8.0"
+                                            className="w-full glass-input text-xs font-bold"
+                                            required
+                                            min={0}
+                                            max={100}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col justify-between h-full space-y-1">
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Stock Level *</label>
                                         <input
                                             type="number"
                                             value={totalStock}
-                                            onChange={(e) => setTotalStock(Number(e.target.value))}
+                                            onChange={(e) => setTotalStock(e.target.value)}
+                                            placeholder="1"
                                             className="w-full glass-input text-xs font-bold"
                                             required
                                             min={1}

@@ -29,11 +29,13 @@ export const Sidebar = () => {
 
     const partnerLinks = [
         { label: 'Analytics Panel', path: '/partner', icon: Home },
+        { label: 'Manage Products', path: '/partner/products', icon: ShoppingBag },
         { label: 'Rental Contracts', path: '/partner/rentals', icon: CalendarRange },
         { label: 'Logistics Pickups', path: '/partner/pickups', icon: Truck },
         { label: 'Logistics Returns', path: '/partner/returns', icon: RotateCcw },
         { label: 'Customer Tickets', path: '/partner/tickets', icon: LifeBuoy },
         { label: 'Enterprise Suite', path: '/partner/enterprise', icon: Cpu },
+        { label: 'Setting Profile', path: '/profile', icon: User },
     ];
 
     const adminLinks = [
@@ -43,6 +45,7 @@ export const Sidebar = () => {
         { label: 'Customer Directory', path: '/admin/customers', icon: UserCheck },
         { label: 'Enterprise Suite', path: '/admin/enterprise', icon: Cpu },
         { label: 'Business Settings', path: '/admin/settings', icon: Settings },
+        { label: 'Setting Profile', path: '/profile', icon: User },
     ];
 
     const links = user?.role === 'Customer' ? customerLinks : (user?.role === 'Rental Partner' ? partnerLinks : adminLinks);

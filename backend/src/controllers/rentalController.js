@@ -8,6 +8,7 @@ import Pickup from '../models/Pickup.js';
 import Return from '../models/Return.js';
 import Setting from '../models/Setting.js';
 import User from '../models/User.js';
+import Coupon from '../models/Coupon.js';
 import Contract from '../models/Contract.js';
 import { triggerEvent } from '../services/eventService.js';
 import { generateInvoicePDF } from '../services/pdfService.js';
@@ -66,7 +67,7 @@ export const createQuotation = async (req, res, next) => {
 
 export const createRentalOrder = async (req, res, next) => {
     try {
-        const { items, startDate, endDate, deliveryType, shippingAddress, paymentMethod } = req.body;
+        const { items, startDate, endDate, deliveryType, shippingAddress, paymentMethod, couponCode } = req.body;
         const customerId = req.user.id;
 
         const start = new Date(startDate);
@@ -74,8 +75,11 @@ export const createRentalOrder = async (req, res, next) => {
         const diffMs = end - start;
         const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 
+        const settings = await Setting.findOne() || {};
+
         let subTotal = 0;
         let securityDepositTotal = 0;
+        let totalPreDiscountTax = 0;
         const computedItems = [];
 
         let orderOwnerId = null;
@@ -114,6 +118,8 @@ export const createRentalOrder = async (req, res, next) => {
             const price = product.priceRate.daily * diffDays;
             subTotal += price * (item.quantity || 1);
             securityDepositTotal += product.securityDeposit * (item.quantity || 1);
+            const productTaxRate = product.taxRate !== undefined ? product.taxRate : (settings.taxRate || 8.5);
+            totalPreDiscountTax += (price * (item.quantity || 1) * productTaxRate) / 100;
 
 
             for (const unit of availUnits) {
@@ -141,10 +147,34 @@ export const createRentalOrder = async (req, res, next) => {
             await product.save();
         }
 
-        const settings = await Setting.findOne() || {};
-        const taxRate = settings.taxRate || 8.5;
-        const taxAmount = Math.round(((subTotal * taxRate) / 100) * 100) / 100;
-        const totalAmount = subTotal + taxAmount + securityDepositTotal;
+        let discountAmount = 0;
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+            if (coupon) {
+                const now = new Date();
+                if (new Date(coupon.expiryDate) >= now && subTotal >= coupon.minPurchase) {
+                    if (coupon.discountType === 'Percentage') {
+                        discountAmount = (subTotal * coupon.value) / 100;
+                        if (coupon.maxDiscountAmount > 0 && discountAmount > coupon.maxDiscountAmount) {
+                            discountAmount = coupon.maxDiscountAmount;
+                        }
+                    } else {
+                        discountAmount = coupon.value;
+                    }
+                    coupon.usesCount += 1;
+                    if (coupon.usesCount >= coupon.usageLimit) {
+                        coupon.isActive = false;
+                    }
+                    await coupon.save();
+                }
+            }
+        }
+
+        const discountedSubtotal = Math.max(0, subTotal - discountAmount);
+        const taxAmount = subTotal > 0
+            ? Math.round(((discountedSubtotal / subTotal) * totalPreDiscountTax) * 100) / 100
+            : 0;
+        const totalAmount = discountedSubtotal + taxAmount + securityDepositTotal;
 
         const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
         const rentalOrder = await RentalOrder.create({
@@ -158,6 +188,7 @@ export const createRentalOrder = async (req, res, next) => {
             subTotal,
             taxAmount,
             securityDepositTotal,
+            discountAmount,
             totalAmount,
             status: 'Pending',
             paymentStatus: 'Unpaid',
@@ -181,6 +212,7 @@ export const createRentalOrder = async (req, res, next) => {
             customer: customerId,
             subTotal,
             taxAmount,
+            discountAmount,
             totalAmount,
             paymentStatus: 'Unpaid'
         });

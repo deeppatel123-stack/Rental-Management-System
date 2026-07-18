@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import RentalOrder from '../models/RentalOrder.js';
+import Setting from '../models/Setting.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,9 @@ export const generateInvoicePDF = async (invoice) => {
         if (invoice.rentalOrder) {
             order = await RentalOrder.findById(invoice.rentalOrder).populate('items.product');
         }
+
+        const settings = await Setting.findOne() || {};
+        const taxRate = settings.taxRate || 8;
 
         // Prepare items list
         const itemsHtml = order?.items?.map(it => `
@@ -398,7 +402,7 @@ export const generateInvoicePDF = async (invoice) => {
                         <span>$${(invoice.subTotal || 0).toFixed(2)}</span>
                     </div>
                     <div class="total-row">
-                        <span>Handling & Tax (18%)</span>
+                        <span>Handling & Tax (${taxRate}%)</span>
                         <span>$${(invoice.taxAmount || 0).toFixed(2)}</span>
                     </div>
                     ${invoice.lateFees > 0 ? `

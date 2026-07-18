@@ -22,8 +22,8 @@ router.get('/:id/reviews', getReviews);
 router.post('/reviews', protect, createReview);
 
 
-router.post('/', protect, authorize('Super Admin'), upload.array('images', 5), createProduct);
-router.put('/:id', protect, authorize('Super Admin'), upload.array('images', 5), updateProduct);
-router.delete('/:id', protect, authorize('Super Admin'), deleteProduct);
+router.post('/', protect, authorize('Super Admin', 'Rental Partner'), upload.array('images', 5), createProduct);
+router.put('/:id', protect, authorize('Super Admin', 'Rental Partner'), upload.array('images', 5), updateProduct);
+router.delete('/:id', protect, authorize('Super Admin', 'Rental Partner'), deleteProduct);
 
 export default router;
