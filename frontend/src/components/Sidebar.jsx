@@ -27,27 +27,37 @@ export const Sidebar = () => {
         { label: 'Setting Profile', path: '/profile', icon: User },
     ];
 
-    const adminLinks = [
-        { label: 'Analytics Panel', path: '/admin', icon: Home, roles: ['Admin', 'Employee'] },
-        { label: 'Manage Products', path: '/admin/products', icon: ShoppingBag, roles: ['Admin', 'Employee'] },
-        { label: 'Staff Directory', path: '/admin/employees', icon: Users, roles: ['Admin'] },
-        { label: 'Customer Directory', path: '/admin/customers', icon: UserCheck, roles: ['Admin'] },
-        { label: 'Rental Contracts', path: '/admin/rentals', icon: CalendarRange, roles: ['Admin', 'Employee'] },
-        { label: 'Logistics Pickups', path: '/admin/pickups', icon: Truck, roles: ['Admin', 'Employee'] },
-        { label: 'Logistics Returns', path: '/admin/returns', icon: RotateCcw, roles: ['Admin', 'Employee'] },
-        { label: 'Customer Tickets', path: '/admin/tickets', icon: LifeBuoy, roles: ['Admin', 'Employee'] },
-        { label: 'Enterprise Suite', path: '/admin/enterprise', icon: Cpu, roles: ['Admin', 'Employee'] },
-        { label: 'Business Settings', path: '/admin/settings', icon: Settings, roles: ['Admin'] },
+    const partnerLinks = [
+        { label: 'Analytics Panel', path: '/partner', icon: Home },
+        { label: 'Manage Products', path: '/partner/products', icon: ShoppingBag },
+        { label: 'Rental Contracts', path: '/partner/rentals', icon: CalendarRange },
+        { label: 'Logistics Pickups', path: '/partner/pickups', icon: Truck },
+        { label: 'Logistics Returns', path: '/partner/returns', icon: RotateCcw },
+        { label: 'Customer Tickets', path: '/partner/tickets', icon: LifeBuoy },
+        { label: 'Enterprise Suite', path: '/partner/enterprise', icon: Cpu },
     ];
 
-    const links = user?.role === 'Customer' ? customerLinks : adminLinks.filter(l => l.roles.includes(user?.role));
+    const adminLinks = [
+        { label: 'Analytics Panel', path: '/admin', icon: Home },
+        { label: 'Manage Products', path: '/admin/products', icon: ShoppingBag },
+        { label: 'Partner Directory', path: '/admin/partners', icon: Users },
+        { label: 'Customer Directory', path: '/admin/customers', icon: UserCheck },
+        { label: 'Rental Contracts', path: '/admin/rentals', icon: CalendarRange },
+        { label: 'Logistics Pickups', path: '/admin/pickups', icon: Truck },
+        { label: 'Logistics Returns', path: '/admin/returns', icon: RotateCcw },
+        { label: 'Customer Tickets', path: '/admin/tickets', icon: LifeBuoy },
+        { label: 'Enterprise Suite', path: '/admin/enterprise', icon: Cpu },
+        { label: 'Business Settings', path: '/admin/settings', icon: Settings },
+    ];
+
+    const links = user?.role === 'Customer' ? customerLinks : (user?.role === 'Rental Partner' ? partnerLinks : adminLinks);
 
     return (
         <aside className="w-64 h-[calc(100vh-73px)] sticky top-[73px] glass-panel border-r border-slate-205/50 dark:border-slate-800/10 hidden md:flex flex-col p-4">
 
             <div className="mb-6 px-3 py-2 bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/10 rounded-xl">
                 <span className="text-[10px] uppercase font-bold text-brand-600 dark:text-brand-400 tracking-wider">Scope Portal</span>
-                <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{user?.role === 'Employee' ? 'Staff' : user?.role} Workspace</h4>
+                <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{user?.role} Workspace</h4>
             </div>
 
             <nav className="flex-1 space-y-1.5">

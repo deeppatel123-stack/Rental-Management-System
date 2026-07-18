@@ -14,13 +14,15 @@ export const ProductCRUD = () => {
 
     const [name, setName] = useState('');
     const [sku, setSku] = useState('');
-    const [category, setCategory] = useState('Cameras');
-    const [brand, setBrand] = useState('Sony');
-    const [daily, setDaily] = useState(50);
-    const [weekly, setWeekly] = useState(250);
-    const [deposit, setDeposit] = useState(100);
+    const [category, setCategory] = useState('');
+    const [brand, setBrand] = useState('');
+    const [daily, setDaily] = useState('');
+    const [weekly, setWeekly] = useState('');
+    const [deposit, setDeposit] = useState('');
     const [description, setDescription] = useState('');
-    const [specStr, setSpecStr] = useState('Sensor: Full Frame, Resolution: 12MP');
+    const [specStr, setSpecStr] = useState('');
+    const [totalStock, setTotalStock] = useState(1);
+    const [imageFiles, setImageFiles] = useState([]);
 
     const fetchCatalog = async () => {
         setLoading(true);
@@ -52,14 +54,16 @@ export const ProductCRUD = () => {
     const openAddModal = () => {
         setEditingId(null);
         setName('');
-        setSku(`RMS-${Math.floor(1000 + Math.random() * 9000)}`);
-        setCategory('Cameras');
-        setBrand('Sony');
-        setDaily(50);
-        setWeekly(250);
-        setDeposit(100);
+        setSku('');
+        setCategory('');
+        setBrand('');
+        setDaily('');
+        setWeekly('');
+        setDeposit('');
         setDescription('');
-        setSpecStr('Sensor: Full Frame, Resolution: 12MP');
+        setSpecStr('');
+        setTotalStock(1);
+        setImageFiles([]);
         setShowModal(true);
     };
 
@@ -73,7 +77,8 @@ export const ProductCRUD = () => {
         setWeekly(prod.priceRate.weekly || 250);
         setDeposit(prod.securityDeposit);
         setDescription(prod.description);
-
+        setTotalStock(prod.stock?.total || 1);
+        setImageFiles([]);
 
         const sStr = prod.specifications?.map(sp => `${sp.key}: ${sp.value}`).join(', ');
         setSpecStr(sStr || '');
@@ -83,7 +88,6 @@ export const ProductCRUD = () => {
     const handleSaveProduct = async (e) => {
         e.preventDefault();
 
-
         const specsArray = specStr.split(',').map(pair => {
             const parts = pair.split(':');
             return {
@@ -92,24 +96,35 @@ export const ProductCRUD = () => {
             };
         });
 
-        const payload = {
-            name,
-            sku,
-            category,
-            brand,
-            priceRate: { daily, weekly },
-            securityDeposit: deposit,
-            description,
-            specifications: specsArray,
-            accessories: ['Standard Battery Pack', 'Carrying Pouch case']
-        };
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('sku', sku);
+        formData.append('category', category);
+        formData.append('brand', brand);
+        formData.append('dailyPrice', daily);
+        formData.append('weeklyPrice', weekly);
+        formData.append('securityDeposit', deposit);
+        formData.append('description', description);
+        formData.append('totalStock', totalStock);
+        formData.append('specifications', JSON.stringify(specsArray));
+        formData.append('accessories', JSON.stringify(['Standard Battery Pack', 'Carrying Pouch case']));
+
+        if (imageFiles && imageFiles.length > 0) {
+            imageFiles.forEach(file => {
+                formData.append('images', file);
+            });
+        }
 
         try {
             if (editingId) {
-                await api.put(`/products/${editingId}`, payload);
+                await api.put(`/products/${editingId}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
                 showToast('Product modified successfully!', 'success');
             } else {
-                await api.post('/products', payload);
+                await api.post('/products', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
                 showToast('Product registered successfully!', 'success');
             }
             setShowModal(false);
@@ -164,7 +179,15 @@ export const ProductCRUD = () => {
                         <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
                             {products.map(prod => (
                                 <tr key={prod._id} className="hover:bg-slate-100/30 dark:hover:bg-slate-900/10 select-none">
-                                    <td className="px-5 py-4 font-bold text-slate-900 dark:text-white">{prod.name}</td>
+                                    <td className="px-5 py-4 font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                                        <img
+                                            src={prod.images?.[0] ? (prod.images[0].startsWith('http') ? prod.images[0] : `http://localhost:5000${prod.images[0]}`) : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=100'}
+                                            alt={prod.name}
+                                            className="w-10 h-10 object-cover rounded-xl border border-slate-200/50 dark:border-slate-800/20"
+                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=100'; }}
+                                        />
+                                        <span>{prod.name}</span>
+                                    </td>
                                     <td className="px-5 py-4 font-mono text-[11px] text-slate-400">{prod.sku}</td>
                                     <td className="px-5 py-4 text-slate-500">{prod.category}</td>
                                     <td className="px-5 py-4 font-bold">${prod.priceRate.daily}</td>
@@ -249,6 +272,7 @@ export const ProductCRUD = () => {
                                             className="w-full glass-input text-xs cursor-pointer select-none"
                                             required
                                         >
+                                            <option value="" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">-- Choose Category --</option>
                                             <option value="Cameras" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Cameras</option>
                                             <option value="Audio" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Audio</option>
                                             <option value="Laptops" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Laptops</option>
@@ -269,10 +293,10 @@ export const ProductCRUD = () => {
                                 </div>
                             </div>
 
-                            {/* Section 2: Pricing Structure */}
+                            {/* Section 2: Pricing & Stock Structure */}
                             <div className="space-y-4">
-                                <h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">Prices Matrix Criteria</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">Prices Matrix & Stock Criteria</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Daily Rate ($) *</label>
                                         <input
@@ -306,13 +330,34 @@ export const ProductCRUD = () => {
                                             min={0}
                                         />
                                     </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Stock level *</label>
+                                        <input
+                                            type="number"
+                                            value={totalStock}
+                                            onChange={(e) => setTotalStock(Number(e.target.value))}
+                                            className="w-full glass-input text-xs font-bold"
+                                            required
+                                            min={1}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Section 3: Extra specs */}
                             <div className="space-y-4">
-                                <h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">Specs & Description</h4>
+                                <h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">Specs, Photos & Description</h4>
                                 <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Product Images</label>
+                                        <input
+                                            type="file"
+                                            multiple
+                                            onChange={(e) => setImageFiles(Array.from(e.target.files))}
+                                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[11px] file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+                                            accept="image/*"
+                                        />
+                                    </div>
                                     <div className="space-y-1">
                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Technical Specs (Comma-Separated Pairs)</label>
                                         <input

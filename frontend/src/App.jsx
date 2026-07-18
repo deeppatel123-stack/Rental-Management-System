@@ -71,14 +71,14 @@ const AppContent = () => {
       showToast(data.message || 'Rental notification received.', 'info');
     });
 
-    // Staff: new order placed by customer
+    // Partner: new order placed by customer
     socket.on('new_order', (data) => {
       showToast(`🛎️ New Order #${data.orderNumber} — ${data.customerName} | $${data.totalAmount?.toFixed(2)}`, 'info');
       // Dispatch event so RentalManagement table auto-refreshes
       window.dispatchEvent(new CustomEvent('rms:new_order', { detail: data }));
     });
 
-    // Customer: staff updated their order status
+    // Customer: partner updated their order status
     socket.on('order_status_updated', (data) => {
       showToast(`📋 Order #${data.orderNumber}: ${data.message}`, 'success');
       // Dispatch event so OrderHistory tracker auto-refreshes
@@ -131,39 +131,64 @@ const AppContent = () => {
               <ProtectedRoute allowedRoles={['Customer']}><Support /></ProtectedRoute>
             } />
             <Route path="/profile" element={
-              <ProtectedRoute allowedRoles={['Customer', 'Admin', 'Employee']}><Profile /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Customer', 'Super Admin', 'Rental Partner']}><Profile /></ProtectedRoute>
             } />
 
+
+            <Route path="/partner" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><AdminDashboard /></ProtectedRoute>
+            } />
+            <Route path="/partner/products" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><ProductCRUD /></ProtectedRoute>
+            } />
+            <Route path="/partner/rentals" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><RentalManagement /></ProtectedRoute>
+            } />
+            <Route path="/partner/pickups" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><PickupWorkflow /></ProtectedRoute>
+            } />
+            <Route path="/partner/returns" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><ReturnWorkflow /></ProtectedRoute>
+            } />
+            <Route path="/partner/tickets" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><AdminTickets /></ProtectedRoute>
+            } />
+            <Route path="/partner/enterprise" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><EnterpriseSuite /></ProtectedRoute>
+            } />
 
             <Route path="/admin" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><AdminDashboard /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><AdminDashboard /></ProtectedRoute>
             } />
             <Route path="/admin/products" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><ProductCRUD /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><ProductCRUD /></ProtectedRoute>
             } />
             <Route path="/admin/rentals" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><RentalManagement /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><RentalManagement /></ProtectedRoute>
             } />
             <Route path="/admin/pickups" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><PickupWorkflow /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><PickupWorkflow /></ProtectedRoute>
             } />
             <Route path="/admin/returns" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><ReturnWorkflow /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><ReturnWorkflow /></ProtectedRoute>
             } />
             <Route path="/admin/tickets" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><AdminTickets /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><AdminTickets /></ProtectedRoute>
             } />
             <Route path="/admin/settings" element={
-              <ProtectedRoute allowedRoles={['Admin']}><GlobalSettings /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><GlobalSettings /></ProtectedRoute>
+            } />
+            <Route path="/admin/partners" element={
+              <ProtectedRoute allowedRoles={['Super Admin']}><EmployeeList /></ProtectedRoute>
             } />
             <Route path="/admin/employees" element={
-              <ProtectedRoute allowedRoles={['Admin']}><EmployeeList /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><EmployeeList /></ProtectedRoute>
             } />
             <Route path="/admin/customers" element={
-              <ProtectedRoute allowedRoles={['Admin']}><CustomerList /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><CustomerList /></ProtectedRoute>
             } />
             <Route path="/admin/enterprise" element={
-              <ProtectedRoute allowedRoles={['Admin', 'Employee']}><EnterpriseSuite /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Super Admin']}><EnterpriseSuite /></ProtectedRoute>
             } />
 
 

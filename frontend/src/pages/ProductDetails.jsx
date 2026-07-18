@@ -96,7 +96,7 @@ export const ProductDetails = () => {
                 <div className="space-y-4">
                     <div className="aspect-video glass-panel rounded-3xl overflow-hidden flex items-center justify-center border border-slate-200/50">
                         <img
-                            src={product.images[0] || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800'}
+                            src={product.images[0] ? (product.images[0].startsWith('http') ? product.images[0] : `http://localhost:5000${product.images[0]}`) : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800'}
                             alt={product.name}
                             className="w-full h-full object-cover"
                             onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800'; }}

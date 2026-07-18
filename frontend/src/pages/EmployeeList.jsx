@@ -11,7 +11,7 @@ export const EmployeeList = () => {
     useEffect(() => {
         const fetch = async () => {
             try {
-                const res = await api.get('/auth/employees');
+                const res = await api.get('/auth/partners');
                 if (res.data.success) setEmployees(res.data.employees);
             } catch (err) {
                 console.error('Failed to load employees', err);
@@ -36,15 +36,15 @@ export const EmployeeList = () => {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-extrabold tracking-tight">Staff Directory</h2>
+                    <h2 className="text-2xl font-extrabold tracking-tight">Rental Partner Directory</h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                        View all staff members, their verification status, and product contributions.
+                        View all rental partners, their verification status, and product contributions.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-brand-500/10 border border-brand-500/20 rounded-xl">
                     <Users className="w-4 h-4 text-brand-500" />
                     <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400">
-                        {employees.length} Staff Members
+                        {employees.length} Rental Partners
                     </span>
                 </div>
             </div>
@@ -52,8 +52,8 @@ export const EmployeeList = () => {
             {employees.length === 0 ? (
                 <div className="glass-panel rounded-3xl py-20 text-center space-y-3 text-slate-400">
                     <Users className="w-10 h-10 mx-auto opacity-30" />
-                    <p className="font-semibold text-sm">No staff members registered yet.</p>
-                    <p className="text-xs">Register staff accounts from the admin panel.</p>
+                    <p className="font-semibold text-sm">No rental partners registered yet.</p>
+                    <p className="text-xs">Register partner accounts from the admin panel.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -155,7 +155,7 @@ export const EmployeeList = () => {
                                     </div>
                                     {emp.productCount > 5 && (
                                         <p className="text-[10px] text-slate-400 text-center mt-3">
-                                            +{emp.productCount - 5} more products added by this employee
+                                            +{emp.productCount - 5} more products added by this partner
                                         </p>
                                     )}
                                 </div>

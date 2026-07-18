@@ -87,6 +87,7 @@ export const CartProvider = ({ children }) => {
             securityHold += item.securityDeposit * item.quantity;
         });
 
+
         const tax = Math.round((subTotal * 0.08) * 100) / 100;
         const grandTotal = subTotal + tax + securityHold;
 

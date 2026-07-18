@@ -26,7 +26,7 @@ export const Navbar = () => {
             </div>
 
             <div className="flex items-center gap-4">
-                
+
                 <button
                     onClick={toggleTheme}
                     className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/20 text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 transition-colors"
@@ -35,7 +35,7 @@ export const Navbar = () => {
                     {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
 
-                
+
                 {user?.role === 'Customer' && (
                     <Link
                         to="/cart"
@@ -50,7 +50,7 @@ export const Navbar = () => {
                     </Link>
                 )}
 
-                
+
                 {user && (
                     <Link
                         to={user.role === 'Customer' ? '/dashboard' : '/admin'}
@@ -61,7 +61,7 @@ export const Navbar = () => {
                     </Link>
                 )}
 
-                
+
                 {user ? (
                     <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-800">
                         <Link to="/profile" className="flex items-center gap-2 group">

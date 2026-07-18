@@ -158,7 +158,7 @@ export const AdminTickets = () => {
                                                 {m.message}
                                             </div>
                                             <span className="text-[9px] text-slate-400 pt-1 px-1">
-                                                {isStaffSender ? `You (${m.sender?.name || 'Staff'})` : `${m.sender?.name || 'Customer'}`}
+                                                {isStaffSender ? `You (${m.sender?.name || 'Partner'})` : `${m.sender?.name || 'Customer'}`}
                                             </span>
                                         </div>
                                     );

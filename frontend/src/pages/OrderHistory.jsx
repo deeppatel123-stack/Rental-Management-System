@@ -31,7 +31,7 @@ export const OrderHistory = () => {
     useEffect(() => {
         fetchOrders();
 
-        // Live tracker: auto-refresh when staff updates order status
+        // Live tracker: auto-refresh when partner updates order status
         const handleStatusUpdate = () => fetchOrders();
         window.addEventListener('rms:order_status_updated', handleStatusUpdate);
         return () => window.removeEventListener('rms:order_status_updated', handleStatusUpdate);
@@ -41,7 +41,7 @@ export const OrderHistory = () => {
         try {
             const res = await api.post(`/rentals/${orderId}/request-return`);
             if (res.data.success) {
-                showToast('Return schedule requested successfully! Staff will check code scan during processing.', 'success');
+                showToast('Return schedule requested successfully! Partner will check code scan during processing.', 'success');
                 fetchOrders();
             }
         } catch (err) {
@@ -142,9 +142,21 @@ export const OrderHistory = () => {
                                             return Object.values(grouped).map(g => `${g.name} (x${g.quantity})`).join(', ');
                                         })()}
                                     </h3>
-                                    <p className="text-[11px] text-slate-450 flex items-center gap-1">
-                                        <Calendar className="w-3.5 h-3.5" /> Booked: {new Date(order.startDate).toLocaleDateString()} - {new Date(order.endDate).toLocaleDateString()}
-                                    </p>
+                                    <div className="flex flex-wrap gap-2 items-center text-[10px] pt-1">
+                                        <p className="text-[11px] text-slate-450 flex items-center gap-1">
+                                            <Calendar className="w-3.5 h-3.5" /> Booked: {new Date(order.startDate).toLocaleDateString()} - {new Date(order.endDate).toLocaleDateString()}
+                                        </p>
+                                        {order.status === 'Confirmed' && order.pickupOtp && (
+                                            <span className="bg-teal-500/10 text-teal-600 dark:text-teal-450 font-extrabold px-2 py-0.5 rounded-lg border border-teal-500/20">
+                                                🔑 Pickup OTP: {order.pickupOtp}
+                                            </span>
+                                        )}
+                                        {order.status === 'Active' && order.returnOtp && (
+                                            <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-405 font-extrabold px-2 py-0.5 rounded-lg border border-indigo-500/20">
+                                                🔑 Return OTP: {order.returnOtp}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-3">

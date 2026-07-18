@@ -237,7 +237,7 @@ export const EnterpriseSuite = () => {
                     { id: 'repairs', label: 'Inspections & Repairs', icon: Wrench },
                     { id: 'coupons', label: 'Promo Coupons', icon: Tag },
                     { id: 'audit', label: 'Compliance Audit', icon: Activity },
-                    ...(user?.role === 'Admin' ? [{ id: 'reports', label: 'Staff Reports', icon: User }] : [])
+                    ...(user?.role === 'Super Admin' ? [{ id: 'reports', label: 'Partner Reports', icon: User }] : [])
                 ].map(t => (
                     <button
                         key={t.id}
@@ -855,12 +855,12 @@ export const EnterpriseSuite = () => {
                         </div>
                     )}
 
-                    {/* STAFF PERFORMANCE REPORTS */}
-                    {activeTab === 'reports' && user?.role === 'Admin' && (
+                    {/* PARTNER PERFORMANCE REPORTS */}
+                    {activeTab === 'reports' && user?.role === 'Super Admin' && (
                         <div className="glass-panel p-5 rounded-3xl space-y-4">
                             <div>
                                 <h3 className="text-sm font-extrabold flex items-center gap-2">
-                                    <User className="w-5 h-5 text-brand-500" /> Staff &amp; Partner Performance Report
+                                    <User className="w-5 h-5 text-brand-500" /> Rental Partner Performance Report
                                 </h3>
                                 <p className="text-[11px] text-slate-400">View real-time isolated sales statistics, active inventory counts, and pending workloads per partner.</p>
                             </div>
@@ -881,7 +881,7 @@ export const EnterpriseSuite = () => {
                                     <tbody>
                                         {staffReports.length === 0 ? (
                                             <tr>
-                                                <td colSpan="7" className="text-center py-6 text-slate-400">No staff members or reports found.</td>
+                                                <td colSpan="7" className="text-center py-6 text-slate-400">No rental partners or reports found.</td>
                                             </tr>
                                         ) : (
                                             staffReports.map(report => (

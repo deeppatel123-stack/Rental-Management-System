@@ -38,7 +38,8 @@ export const AdminDashboard = () => {
     }
 
     const stats = metrics?.stats || {};
-    const isAdmin = user?.role === 'Admin';
+    const isAdmin = user?.role === 'Super Admin';
+    const basePath = isAdmin ? '/admin' : '/partner';
 
     const kpis = isAdmin ? [
         { label: 'Total Earnings', val: `$${(stats.totalRevenue || 0).toLocaleString()}`, icon: DollarSign, color: 'text-indigo-500 bg-indigo-500/10' },
@@ -86,7 +87,7 @@ export const AdminDashboard = () => {
                         <h3 className="font-extrabold text-sm border-b border-slate-205 dark:border-slate-800/10 pb-3">Monthly Rental Earnings</h3>
 
                         <div className="h-64 w-full text-xs">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="105%">
                                 <AreaChart data={metrics?.charts?.monthlyRevenue || []}>
                                     <defs>
                                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -107,19 +108,19 @@ export const AdminDashboard = () => {
                         <h3 className="font-extrabold text-sm border-b border-slate-205 dark:border-slate-800/10 pb-3">Quick Logistics Shortcuts</h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                            <Link to="/admin/rentals" className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
+                            <Link to={`${basePath}/rentals`} className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
                                 <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Logistics workflow</span>
                                 <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 transition-colors">Confirm Contracts &rarr;</span>
                             </Link>
-                            <Link to="/admin/pickups" className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
+                            <Link to={`${basePath}/pickups`} className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
                                 <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Warehouse checklist</span>
                                 <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 transition-colors">Process Pickups &rarr;</span>
                             </Link>
-                            <Link to="/admin/returns" className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
+                            <Link to={`${basePath}/returns`} className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
                                 <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Quality inspection</span>
                                 <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 transition-colors">Process Returns &rarr;</span>
                             </Link>
-                            <Link to="/admin/tickets" className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
+                            <Link to={`${basePath}/tickets`} className="p-4 bg-slate-100/50 dark:bg-slate-900/40 border border-slate-200/5 hover:border-brand-500/20 rounded-2xl flex flex-col justify-between h-28 group transition-all">
                                 <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Support communication</span>
                                 <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 group-hover:text-brand-500 transition-colors">Resolve Tickets &rarr;</span>
                             </Link>

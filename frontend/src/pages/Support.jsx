@@ -71,7 +71,7 @@ export const Support = () => {
                 setDescription('');
                 setShowCreate(false);
                 fetchTickets();
-                showToast('Ticket created! Staff will reply shortly.', 'success');
+                showToast('Ticket created! Support will reply shortly.', 'success');
             }
         } catch (err) {
             showToast('Failed to register support request.', 'error');
@@ -154,7 +154,7 @@ export const Support = () => {
                                                 {m.message}
                                             </div>
                                             <span className="text-[9px] text-slate-400 pt-1 px-1">
-                                                {isStaff ? `${m.sender?.name || 'Support Staff'} (Agent)` : 'You'}
+                                                {isStaff ? `${m.sender?.name || 'Support Partner'} (Agent)` : 'You'}
                                             </span>
                                         </div>
                                     );

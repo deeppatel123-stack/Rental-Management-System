@@ -29,6 +29,8 @@ export const VerifyOTP = () => {
                 loginUser(user, token, refreshToken);
                 if (user.role === 'Customer') {
                     navigate('/');
+                } else if (user.role === 'Rental Partner') {
+                    navigate('/partner');
                 } else {
                     navigate('/admin');
                 }

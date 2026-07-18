@@ -14,11 +14,11 @@ export const Cart = () => {
 
     const [deliveryType, setDeliveryType] = useState('Store Pickup');
     const [shippingAddress, setShippingAddress] = useState({
-        street: '742 Evergreen Terrace',
-        city: 'Springfield',
-        state: 'IL',
-        zipCode: '62704',
-        country: 'USA'
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: ''
     });
     const [paymentMethod, setPaymentMethod] = useState('Card');
 
@@ -70,7 +70,7 @@ export const Cart = () => {
                                     <div className="flex items-center gap-3">
                                         <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/5 overflow-hidden flex-shrink-0">
                                             <img
-                                                src={item.image || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=150'}
+                                                src={item.image ? (item.image.startsWith('http') ? item.image : `http://localhost:5000${item.image}`) : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=150'}
                                                 alt={item.name}
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=150'; }}
@@ -145,6 +145,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.street}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })}
+                                            placeholder="e.g. 129 Baker Street"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
@@ -154,6 +155,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.city}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                                            placeholder="e.g. New York"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
@@ -163,6 +165,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.state}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                                            placeholder="e.g. NY"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
@@ -172,6 +175,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.zipCode}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, zipCode: e.target.value })}
+                                            placeholder="e.g. 10001"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>

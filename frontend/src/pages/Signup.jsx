@@ -26,8 +26,8 @@ export const Signup = () => {
         try {
             const response = await api.post('/auth/register', { name, email, password, phone, role });
             if (response.data.success) {
-                if (role === 'Admin') {
-                    showToast('Admin account registered! Please log in directly.', 'success');
+                if (role === 'Super Admin') {
+                    showToast('Super Admin account registered! Please log in directly.', 'success');
                     navigate('/login');
                 } else {
                     showToast('Registration successful! Verification code sent.', 'success');
@@ -110,9 +110,9 @@ export const Signup = () => {
                             className="w-full glass-input cursor-pointer"
                             required
                         >
-                            <option value="Customer" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Client (Customer)</option>
-                            <option value="Employee" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Staff (Employee)</option>
-                            <option value="Admin" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Admin (SaaS Administrator)</option>
+                            <option value="Customer" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Customer (Client)</option>
+                            <option value="Rental Partner" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Rental Partner</option>
+                            <option value="Super Admin" className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Super Admin</option>
                         </select>
                     </div>
 

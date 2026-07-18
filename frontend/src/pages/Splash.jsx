@@ -261,7 +261,7 @@ export const Splash = () => {
                         {[
                             { q: 'How does the escrow security deposit workflow work?', a: 'When checking out items, a preset deposit is held. Once returned items pass physical damage verification scanners at our warehouse, the escrow ledger completes or issues partial deduction settlements.' },
                             { q: 'What late-return penalties are enforced automatically?', a: 'We track return coordinates via GPS and check against return deadlines. Late fees accumulate based on hourly, daily, or weekly rates configured in setting dashboards with client-specific grace periods.' },
-                            { q: 'Can we assign multiple warehouse staff to routes?', a: 'Yes. The driver assignment module optimizes multi-stop logistics route waypoints, distributing delivery or pickup sheets to registered courier staff.' },
+                            { q: 'Can we assign multiple warehouse partners to routes?', a: 'Yes. The driver assignment module optimizes multi-stop logistics route waypoints, distributing delivery or pickup sheets to registered courier partners or drivers.' },
                             { q: 'Do you support customized quotes and agreements?', a: 'Yes, operators can formulate customized quotation proposals, send email sheets, check availability calendars, and generate complete rental agreements.' }
                         ].map((faq, idx) => (
                             <div key={idx} className="glass-panel rounded-2xl overflow-hidden border border-slate-200/50 dark:border-slate-800/15">
@@ -373,7 +373,7 @@ export const Splash = () => {
                 <div className="glass-panel rounded-[3rem] p-10 md:p-16 border border-brand-500/10 space-y-8 relative overflow-hidden bg-gradient-to-tr from-brand-600/5 to-indigo-600/5">
                     <h2 className="text-3xl md:text-5xl font-extrabold leading-tight">Ready to Authenticate Console Sessions?</h2>
                     <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 max-w-xl mx-auto leading-relaxed">
-                        Register standard access credentials for Admin, Staff, or Customer accounts, verify via local mock OTP tokens, and start testing.
+                        Register standard access credentials for Super Admin, Rental Partner, or Customer accounts, verify via local mock OTP tokens, and start testing.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-sm mx-auto">
                         <button

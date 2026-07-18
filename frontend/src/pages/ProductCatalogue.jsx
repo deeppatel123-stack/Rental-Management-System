@@ -166,7 +166,7 @@ export const ProductCatalogue = () => {
 
                             <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900/60 flex items-center justify-center">
                                 <img
-                                    src={prod.images[0] || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'}
+                                    src={prod.images[0] ? (prod.images[0].startsWith('http') ? prod.images[0] : `http://localhost:5000${prod.images[0]}`) : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'}
                                     alt={prod.name}
                                     className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
                                     onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'; }}
