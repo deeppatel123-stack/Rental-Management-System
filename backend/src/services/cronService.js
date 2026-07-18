@@ -32,7 +32,7 @@ export const initCronJob = () => {
 
 
             const overdueOrders = await RentalOrder.find({
-                status: { $in: ['Active', 'Picked Up'] },
+                status: { $in: ['Active', 'Picked Up', 'Delivered'] },
                 endDate: { $lt: now }
             }).populate('customer');
 

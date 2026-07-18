@@ -113,12 +113,13 @@ export const ReturnWorkflow = () => {
     const fetchEmployees = useCallback(async () => {
         try {
             const res = await api.get('/auth/employees');
-            if (res.data.success) setEmployees(res.data.data || res.data.employees || []);
+            if (res.data.success) {
+                // Only show Delivery Executives in the assignment dropdown, not Rental Partners
+                const all = res.data.data || res.data.employees || [];
+                setEmployees(all.filter(emp => emp.role === 'Delivery Executive'));
+            }
         } catch {
-            setEmployees([
-                { _id: 'emp-1', name: 'Raj Kumar (Return Exec)', email: 'raj@rental.com' },
-                { _id: 'emp-2', name: 'Priya Sharma (Inspector)', email: 'priya@rental.com' },
-            ]);
+            setEmployees([]);
         }
     }, []);
 

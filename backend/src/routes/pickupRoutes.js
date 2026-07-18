@@ -6,7 +6,9 @@ import {
     schedulePickup,
     updatePickupStatus,
     verifyPickupCode,
-    confirmPickup
+    confirmPickup,
+    generatePickupOtp,
+    customerVerifyOtp
 } from '../controllers/pickupController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
@@ -25,5 +27,7 @@ router.put('/:id/schedule', authorize('Rental Partner'), schedulePickup);
 router.patch('/:id/status', authorize('Rental Partner'), updatePickupStatus);
 router.post('/:id/verify', authorize('Rental Partner'), verifyPickupCode);
 router.post('/:id/confirm', authorize('Rental Partner'), confirmPickup);
+router.post('/:id/generate-otp', authorize('Rental Partner'), generatePickupOtp);
+router.post('/:id/customer-verify', customerVerifyOtp);
 
 export default router;

@@ -31,11 +31,14 @@ import ProductCRUD from './pages/ProductCRUD';
 import RentalManagement from './pages/RentalManagement';
 import PickupWorkflow from './pages/PickupWorkflow';
 import ReturnWorkflow from './pages/ReturnWorkflow';
+import PartnerMap from './pages/PartnerMap';
 import AdminTickets from './pages/AdminTickets';
 import GlobalSettings from './pages/GlobalSettings';
 import EmployeeList from './pages/EmployeeList';
 import CustomerList from './pages/CustomerList';
 import EnterpriseSuite from './pages/EnterpriseSuite';
+import { AddProductPage } from './pages/AddProductPage';
+import { ManageExecutives } from './pages/ManageExecutives';
 
 
 import { Bell, X } from 'lucide-react';
@@ -147,6 +150,9 @@ const AppContent = () => {
             <Route path="/partner/returns" element={
               <ProtectedRoute allowedRoles={['Rental Partner']}><ReturnWorkflow /></ProtectedRoute>
             } />
+            <Route path="/partner/maps" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><PartnerMap /></ProtectedRoute>
+            } />
             <Route path="/partner/tickets" element={
               <ProtectedRoute allowedRoles={['Rental Partner']}><AdminTickets /></ProtectedRoute>
             } />
@@ -156,12 +162,21 @@ const AppContent = () => {
             <Route path="/partner/products" element={
               <ProtectedRoute allowedRoles={['Rental Partner']}><ProductCRUD /></ProtectedRoute>
             } />
+            <Route path="/partner/add-product" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><AddProductPage /></ProtectedRoute>
+            } />
+            <Route path="/partner/executives" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><ManageExecutives /></ProtectedRoute>
+            } />
 
             <Route path="/admin" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><AdminDashboard /></ProtectedRoute>
             } />
             <Route path="/admin/products" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><ProductCRUD /></ProtectedRoute>
+            } />
+            <Route path="/admin/add-product" element={
+              <ProtectedRoute allowedRoles={['Super Admin']}><AddProductPage /></ProtectedRoute>
             } />
             <Route path="/admin/settings" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><GlobalSettings /></ProtectedRoute>

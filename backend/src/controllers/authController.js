@@ -6,7 +6,7 @@ import { sendEmail } from '../services/emailService.js';
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretjwtkeyforrentalmanagementsystem123!', {
-        expiresIn: process.env.JWT_EXPIRE || '2h',
+        expiresIn: process.env.JWT_EXPIRE || '2d',
     });
 };
 
@@ -313,16 +313,20 @@ export const resendVerification = async (req, res, next) => {
     }
 };
 
-// Admin: list all rental partners (Super Admin sees all; Rental Partner sees only themselves)
+// Admin: list all rental partners & executives (Super Admin sees all; Rental Partner sees only themselves and their added executives)
 export const getEmployeeList = async (req, res, next) => {
     try {
-        // Rental Partners can only see themselves (for self-assignment in logistics)
         const query = req.user.role === 'Rental Partner'
-            ? { _id: req.user.id, role: 'Rental Partner' }
-            : { role: 'Rental Partner' };
+            ? {
+                $or: [
+                    { _id: req.user.id, role: 'Rental Partner' },
+                    { role: 'Delivery Executive', addedBy: req.user.id }
+                ]
+            }
+            : { role: { $in: ['Rental Partner', 'Delivery Executive'] } };
 
         const employees = await User.find(query)
-            .select('name email phone isVerified createdAt')
+            .select('name email phone role isVerified createdAt')
             .sort({ createdAt: -1 });
 
         const Product = (await import('../models/Product.js')).default;
@@ -335,9 +339,10 @@ export const getEmployeeList = async (req, res, next) => {
                 .limit(5);
             return {
                 _id: emp._id,
-                name: emp.name,
+                name: emp.role === 'Delivery Executive' ? `${emp.name} (Executive)` : emp.name,
                 email: emp.email,
                 phone: emp.phone,
+                role: emp.role,
                 isVerified: emp.isVerified,
                 createdAt: emp.createdAt,
                 productCount,
@@ -346,6 +351,45 @@ export const getEmployeeList = async (req, res, next) => {
         }));
 
         res.json({ success: true, employees: employeesWithCounts, partners: employeesWithCounts });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Rental Partner / Super Admin: Add new Delivery Executive
+export const addExecutive = async (req, res, next) => {
+    try {
+        const { name, email, password, phone } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+        }
+
+        const existing = await User.findOne({ email });
+        if (existing) {
+            return res.status(400).json({ success: false, message: 'Email is already registered' });
+        }
+
+        const executive = await User.create({
+            name,
+            email,
+            password,
+            phone: phone || '',
+            role: 'Delivery Executive',
+            addedBy: req.user.id,
+            isVerified: true
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `Delivery executive "${name}" added successfully!`,
+            executive: {
+                _id: executive._id,
+                name: executive.name,
+                email: executive.email,
+                phone: executive.phone,
+                role: executive.role
+            }
+        });
     } catch (error) {
         next(error);
     }

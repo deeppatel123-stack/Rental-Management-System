@@ -12,36 +12,36 @@ dotenv.config();
 
 const usersSeed = [
     {
-        name: 'Sarah Connor',
-        email: 'admin@rental.com',
-        password: 'password123',
+        name: 'Bhaumik',
+        email: 'bhaumikkothiya1@gmail.com',
+        password: 'Bhaumik@1910',
         role: 'Super Admin',
-        phone: '+1 555-0199',
+        phone: '+91 9876543210',
         isVerified: true
     },
     {
-        name: 'John Doe',
-        email: 'employee@rental.com',
-        password: 'password123',
+        name: 'Mayank',
+        email: 'bhaumikkothiya@gmail.com',
+        password: 'Mayank@123',
         role: 'Rental Partner',
-        phone: '+1 555-0188',
+        phone: '+91 1234567891',
         isVerified: true
     },
     {
-        name: 'Alice Smith',
-        email: 'customer@rental.com',
-        password: 'password123',
+        name: 'Deep',
+        email: 'patel10royal@gmail.com',
+        password: 'Deep@123',
         role: 'Customer',
-        phone: '+1 555-0177',
+        phone: '+91 1234567891',
         isVerified: true,
         loyaltyPoints: 120,
         addresses: [
             {
-                street: '742 Evergreen Terrace',
-                city: 'Springfield',
-                state: 'IL',
-                zipCode: '62704',
-                country: 'USA',
+                street: 'Infocity Pathway',
+                city: 'Gandhinagar',
+                state: 'Gujarat',
+                zipCode: '382007',
+                country: 'India',
                 isDefault: true
             }
         ]

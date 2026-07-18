@@ -92,6 +92,32 @@ export const triggerEvent = async (eventName, payload) => {
                 order.status = 'Confirmed'; // compatible
                 await order.save();
 
+                // Auto-create Pickup record so it goes into logistics pickup
+                const existingPickup = await Pickup.findOne({ rentalOrder: order._id });
+                if (!existingPickup) {
+                    const pickupOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                    const pickupChecklist = order.items.map(it => ({
+                        productName: it.name,
+                        serialNumber: '',
+                        isVerified: false
+                    }));
+
+                    await Pickup.create({
+                        rentalOrder: order._id,
+                        customer: order.customer._id,
+                        productId: order.items[0]?.product,
+                        scheduledDate: order.startDate,
+                        checklist: pickupChecklist,
+                        otp: pickupOtp,
+                        status: 'Pending',
+                        ownerId: order.ownerId,
+                        timeline: [{
+                            status: 'Pending',
+                            notes: 'Pickup request generated automatically after operator activation.'
+                        }]
+                    });
+                }
+
                 // 2. Notify Customer & Admin
                 await sendNotification(
                     order.customer._id,
@@ -206,11 +232,11 @@ export const triggerEvent = async (eventName, payload) => {
             }
 
             case 'PickupCompleted': {
-                // Update Order status to Active Rental
-                order.status = 'Active';
+                // Update Order status to Delivered
+                order.status = 'Delivered';
                 order.timeline.push({
-                    status: 'Active Rental',
-                    description: 'Handover complete! Item picked up and rental period commenced.',
+                    status: 'Delivered',
+                    description: 'Handover complete! Item delivered successfully and rental period commenced.',
                     updatedBy: userId
                 });
                 await order.save();
@@ -248,8 +274,35 @@ export const triggerEvent = async (eventName, payload) => {
                     order._id
                 );
 
+                // Auto-create Return record as Pending under Return Logistics
+                const existingReturn = await Return.findOne({ rentalOrder: order._id });
+                if (!existingReturn) {
+                    const returnOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                    const returnChecklist = order.items.map(it => ({
+                        productName: it.name,
+                        serialNumber: '',
+                        status: 'Returned',
+                        conditionRating: 'Excellent'
+                    }));
+
+                    await Return.create({
+                        rentalOrder: order._id,
+                        customer: order.customer._id,
+                        productId: order.items[0]?.product,
+                        scheduledDate: order.endDate,
+                        checklist: returnChecklist,
+                        otp: returnOtp,
+                        status: 'Pending',
+                        ownerId: order.ownerId,
+                        timeline: [{
+                            status: 'Pending',
+                            notes: 'Return item record initialized automatically after pickup completion.'
+                        }]
+                    });
+                }
+
                 if (io) {
-                    io.emit('order_refreshed', { orderId: order._id, status: 'Active' });
+                    io.emit('order_refreshed', { orderId: order._id, status: 'Delivered' });
                 }
                 break;
             }

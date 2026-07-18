@@ -27,15 +27,22 @@ export const createQuotation = async (req, res, next) => {
 
         let subTotal = 0;
         let securityDepositTotal = 0;
+        let taxAmount = 0;
         const computedItems = [];
+
+        const settings = await Setting.findOne() || {};
 
         for (const item of items) {
             const product = await Product.findById(item.productId);
             if (!product) return res.status(404).json({ success: false, message: `Product ${item.productId} not found` });
 
             const price = product.priceRate.daily * diffDays;
-            subTotal += price * (item.quantity || 1);
+            const itemSubtotal = price * (item.quantity || 1);
+            subTotal += itemSubtotal;
             securityDepositTotal += product.securityDeposit * (item.quantity || 1);
+
+            const productTaxRate = product.taxRate !== undefined ? product.taxRate : (settings.taxRate || 8.5);
+            taxAmount += (itemSubtotal * productTaxRate) / 100;
 
             computedItems.push({
                 product: product._id,
@@ -46,9 +53,7 @@ export const createQuotation = async (req, res, next) => {
             });
         }
 
-        const settings = await Setting.findOne() || {};
-        const taxRate = settings.taxRate || 8.5;
-        const taxAmount = (subTotal * taxRate) / 100;
+        taxAmount = Math.round(taxAmount * 100) / 100;
         const totalAmount = subTotal + taxAmount + securityDepositTotal;
 
         res.json({
@@ -67,7 +72,7 @@ export const createQuotation = async (req, res, next) => {
 
 export const createRentalOrder = async (req, res, next) => {
     try {
-        const { items, startDate, endDate, deliveryType, shippingAddress, paymentMethod, couponCode } = req.body;
+        const { items, startDate, endDate, deliveryType, shippingAddress, paymentMethod, couponCode, deliveryFee } = req.body;
         const customerId = req.user.id;
 
         const start = new Date(startDate);
@@ -79,7 +84,7 @@ export const createRentalOrder = async (req, res, next) => {
 
         let subTotal = 0;
         let securityDepositTotal = 0;
-        let totalPreDiscountTax = 0;
+        let minTaxRate = Infinity;
         const computedItems = [];
 
         let orderOwnerId = null;
@@ -119,7 +124,9 @@ export const createRentalOrder = async (req, res, next) => {
             subTotal += price * (item.quantity || 1);
             securityDepositTotal += product.securityDeposit * (item.quantity || 1);
             const productTaxRate = product.taxRate !== undefined ? product.taxRate : (settings.taxRate || 8.5);
-            totalPreDiscountTax += (price * (item.quantity || 1) * productTaxRate) / 100;
+            if (productTaxRate < minTaxRate) {
+                minTaxRate = productTaxRate;
+            }
 
 
             for (const unit of availUnits) {
@@ -144,8 +151,12 @@ export const createRentalOrder = async (req, res, next) => {
 
             product.stock.available -= (item.quantity || 1);
             product.stock.reserved += (item.quantity || 1);
-            await product.save();
         }
+
+        if (minTaxRate === Infinity) {
+            minTaxRate = settings.taxRate || 8.5;
+        }
+        const totalPreDiscountTax = (subTotal * minTaxRate) / 100;
 
         let discountAmount = 0;
         if (couponCode) {
@@ -174,7 +185,7 @@ export const createRentalOrder = async (req, res, next) => {
         const taxAmount = subTotal > 0
             ? Math.round(((discountedSubtotal / subTotal) * totalPreDiscountTax) * 100) / 100
             : 0;
-        const totalAmount = discountedSubtotal + taxAmount + securityDepositTotal;
+        const totalAmount = discountedSubtotal + taxAmount + securityDepositTotal + (Number(deliveryFee) || 0);
 
         const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
         const rentalOrder = await RentalOrder.create({
@@ -189,6 +200,7 @@ export const createRentalOrder = async (req, res, next) => {
             taxAmount,
             securityDepositTotal,
             discountAmount,
+            deliveryFee: Number(deliveryFee) || 0,
             totalAmount,
             status: 'Pending',
             paymentStatus: 'Unpaid',
@@ -318,11 +330,15 @@ export const getRentalOrders = async (req, res, next) => {
             .lean();
 
         const orders = await Promise.all(rawOrders.map(async (order) => {
-            const pickupDoc = await Pickup.findOne({ rentalOrder: order._id }).select('otp');
-            const returnDoc = await Return.findOne({ rentalOrder: order._id }).select('otp');
+            const pickupDoc = await Pickup.findOne({ rentalOrder: order._id }).select('otp status');
+            const returnDoc = await Return.findOne({ rentalOrder: order._id }).select('otp status');
             return {
                 ...order,
+                pickupId: pickupDoc ? pickupDoc._id : null,
+                pickupStatus: pickupDoc ? pickupDoc.status : null,
                 pickupOtp: pickupDoc ? pickupDoc.otp : null,
+                returnId: returnDoc ? returnDoc._id : null,
+                returnStatus: returnDoc ? returnDoc.status : null,
                 returnOtp: returnDoc ? returnDoc.otp : null
             };
         }));
@@ -480,7 +496,7 @@ export const deleteRentalOrder = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
-        const ALLOWED = ['Pending', 'Confirmed', 'Ready for Pickup', 'Active', 'Return Requested', 'Completed', 'Overdue', 'Cancelled'];
+        const ALLOWED = ['Pending', 'Confirmed', 'Ready for Pickup', 'Active', 'Delivered', 'Return Requested', 'Completed', 'Overdue', 'Cancelled'];
         if (!ALLOWED.includes(status)) {
             return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${ALLOWED.join(', ')}` });
         }
@@ -498,7 +514,7 @@ export const updateOrderStatus = async (req, res, next) => {
         } else if (status === 'Ready for Pickup') {
             await triggerEvent('ContractSigned', { orderId: order._id, userId: req.user.id, extraData: { signature: order.customerSignature || 'E-Signed' } });
             await triggerEvent('PaymentCompleted', { orderId: order._id, userId: req.user.id });
-        } else if (status === 'Active') {
+        } else if (status === 'Active' || status === 'Delivered') {
             await triggerEvent('PickupCompleted', { orderId: order._id, userId: req.user.id });
         } else if (status === 'Completed') {
             await triggerEvent('ReturnCompleted', { orderId: order._id, userId: req.user.id, extraData: { inspectionData: { overallCondition: 'Excellent' } } });

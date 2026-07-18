@@ -8,9 +8,9 @@ import User from '../models/User.js';
 import { generateQRCode } from '../services/qrService.js';
 import { triggerEvent } from '../services/eventService.js';
 
-// ─────────────────────────────────────────────
+// 
 // GET ALL PICKUPS (role-filtered)
-// ─────────────────────────────────────────────
+// 
 export const getPickups = async (req, res, next) => {
     try {
         const query = {};
@@ -34,9 +34,9 @@ export const getPickups = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+// 
 // GET SINGLE PICKUP BY ID
-// ─────────────────────────────────────────────
+// 
 export const getPickupById = async (req, res, next) => {
     try {
         const pickup = await Pickup.findById(req.params.id)
@@ -61,9 +61,9 @@ export const getPickupById = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+// 
 // ASSIGN PICKUP EXECUTIVE
-// ─────────────────────────────────────────────
+// 
 export const assignPickup = async (req, res, next) => {
     try {
         const { employeeId } = req.body;
@@ -77,31 +77,36 @@ export const assignPickup = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized partner access' });
         }
 
-        // Verify order pre-conditions: Rental must be Confirmed, Payment Paid, Deposit Held/Paid
+        // Verify order pre-conditions: allow assignment for any non-completed/non-cancelled rental
         const order = await RentalOrder.findById(pickup.rentalOrder);
         if (!order) return res.status(404).json({ success: false, message: 'Associated rental order not found' });
 
-        if (order.status !== 'Confirmed') {
+        const ASSIGNABLE_STATUSES = ['Confirmed', 'Ready for Pickup', 'Active', 'Picked Up'];
+        if (!ASSIGNABLE_STATUSES.includes(order.status)) {
             return res.status(400).json({
                 success: false,
-                message: `Pickup can only be initiated for Confirmed orders. Current status: ${order.status}`
+                message: `Cannot assign pickup for order with status: ${order.status}. Order must be Confirmed, Ready for Pickup, or Active.`
             });
         }
-        if (order.paymentStatus !== 'Paid') {
-            return res.status(400).json({ success: false, message: 'Payment must be completed before assigning pickup.' });
-        }
-        if (!['Held', 'Paid'].includes(order.depositStatus)) {
-            return res.status(400).json({ success: false, message: 'Security deposit must be collected before assigning pickup.' });
-        }
 
-        const executive = await User.findById(employeeId).select('name email');
+        // Verify the executive belongs to this Rental Partner
+        const executive = await User.findById(employeeId).select('name email role addedBy');
+        if (!executive) return res.status(404).json({ success: false, message: 'Executive not found' });
+        if (executive.role !== 'Delivery Executive') {
+            return res.status(400).json({ success: false, message: 'Selected user is not a Delivery Executive.' });
+        }
+        if (req.user.role === 'Rental Partner' && executive.addedBy?.toString() !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'You can only assign executives that you have registered.' });
+        }
 
         pickup.assignedEmployee = employeeId;
         pickup.assignedExecutiveId = employeeId;
         pickup.status = 'Assigned';
+        // Auto-generate OTP on assignment so customer can see it immediately
+        pickup.otp = Math.floor(100000 + Math.random() * 900000).toString();
         pickup.timeline.push({
             status: 'Assigned',
-            notes: `Pickup executive assigned: ${executive?.name || employeeId}`,
+            notes: `Pickup executive assigned: ${executive?.name || employeeId}. OTP auto-generated.`,
             updatedBy: req.user.id
         });
         await pickup.save();
@@ -128,9 +133,9 @@ export const assignPickup = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+// 
 // SCHEDULE PICKUP DATE & TIME (generates QR)
-// ─────────────────────────────────────────────
+// 
 export const schedulePickup = async (req, res, next) => {
     try {
         const { scheduledDate, vehicleDetails, notes } = req.body;
@@ -195,9 +200,9 @@ export const schedulePickup = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+// 
 // UPDATE PICKUP STATUS (On The Way, Cancelled, etc.)
-// ─────────────────────────────────────────────
+// 
 export const updatePickupStatus = async (req, res, next) => {
     try {
         const { status, notes } = req.body;
@@ -237,13 +242,13 @@ export const updatePickupStatus = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+// 
 // VERIFY OTP OR QR CODE
-// ─────────────────────────────────────────────
+// 
 export const verifyPickupCode = async (req, res, next) => {
     try {
         const { otp, qrScanned } = req.body;
-        const pickup = await Pickup.findById(req.params.id).populate('rentalOrder', 'orderNumber');
+        const pickup = await Pickup.findById(req.params.id).populate('rentalOrder');
         if (!pickup) return res.status(404).json({ success: false, message: 'Pickup not found' });
 
         // RLS
@@ -251,45 +256,61 @@ export const verifyPickupCode = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized partner access' });
         }
 
-        if (pickup.status !== 'On The Way') {
-            return res.status(400).json({ success: false, message: 'OTP/QR can only be verified when status is "On The Way"' });
+        // Must be in an active logistics state
+        const VERIFIABLE_STATUSES = ['On The Way', 'Assigned', 'Scheduled', 'OTP Verified'];
+        if (!VERIFIABLE_STATUSES.includes(pickup.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Pickup must be in an active delivery state to verify. Current: ${pickup.status}`
+            });
         }
 
         if (otp) {
-            if (pickup.otp !== otp) {
+            if (pickup.otp !== otp.toString()) {
                 return res.status(400).json({ success: false, message: 'Invalid OTP. Please ask the customer to share the correct code.' });
             }
-            pickup.isOtpVerified = true;
-            pickup.status = 'OTP Verified';
-            pickup.timeline.push({
-                status: 'OTP Verified',
-                notes: 'Customer OTP verified successfully',
-                updatedBy: req.user.id
-            });
-        } else if (qrScanned) {
-            pickup.qrScanned = true;
-            pickup.isOtpVerified = true;
-            pickup.status = 'QR Verified';
-            pickup.timeline.push({
-                status: 'QR Verified',
-                notes: 'Customer QR code scanned and verified',
-                updatedBy: req.user.id
-            });
-        } else {
+        } else if (!qrScanned) {
             return res.status(400).json({ success: false, message: 'Provide either OTP or QR scan confirmation' });
         }
 
+        // Directly complete the pickup
+        pickup.isOtpVerified = true;
+        pickup.customerSignature = 'OTP Verified Handoff';
+        pickup.actualPickupDate = new Date();
+        pickup.status = 'Completed';
+        pickup.timeline.push({
+            status: 'Completed',
+            notes: otp ? `Partner verified customer OTP. Pickup marked Completed.` : 'QR Code scanned. Pickup marked Completed.',
+            updatedBy: req.user.id
+        });
         await pickup.save();
 
-        res.json({ success: true, message: `${otp ? 'OTP' : 'QR'} verified successfully!`, pickup });
+        // Trigger order → Active + auto-create Return record
+        const order = await RentalOrder.findById(pickup.rentalOrder._id || pickup.rentalOrder);
+        if (order) {
+            await triggerEvent('PickupCompleted', { orderId: order._id, userId: req.user.id });
+        }
+
+        await ActivityLog.create({
+            user: req.user.id,
+            action: 'Verify Pickup OTP',
+            module: 'Logistics',
+            details: `Pickup for order #${order?.orderNumber} completed via OTP verification`
+        });
+
+        res.json({
+            success: true,
+            message: 'Pickup completed successfully! Order is now Active and queued for return.',
+            pickup
+        });
     } catch (error) {
         next(error);
     }
 };
 
-// ─────────────────────────────────────────────
+// 
 // CONFIRM PICKUP COMPLETION (inventory sync, order → Active)
-// ─────────────────────────────────────────────
+// 
 export const confirmPickup = async (req, res, next) => {
     try {
         const { checklist, signature } = req.body;
@@ -341,6 +362,89 @@ export const confirmPickup = async (req, res, next) => {
         res.json({
             success: true,
             message: `Pickup completed! Order #${order.orderNumber} is now Active.`,
+            pickup,
+            order: updatedOrder
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 
+// GENERATE OTP (called by executive/partner when they reach customer)
+// 
+export const generatePickupOtp = async (req, res, next) => {
+    try {
+        const pickup = await Pickup.findById(req.params.id).populate('rentalOrder', 'orderNumber');
+        if (!pickup) return res.status(404).json({ success: false, message: 'Pickup not found' });
+
+        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        pickup.otp = newOtp;
+        pickup.status = 'On The Way';
+        pickup.timeline.push({
+            status: 'On The Way',
+            notes: 'Executive generated new handoff verification OTP.',
+            updatedBy: req.user.id
+        });
+        await pickup.save();
+
+        await Notification.create({
+            user: pickup.customer,
+            title: '🔑 Delivery Verification OTP',
+            message: `Your executive has generated a receipt verification OTP: ${newOtp}. Enter this to confirm delivery receipt.`,
+            type: 'Rental',
+            referenceId: pickup.rentalOrder._id || pickup.rentalOrder
+        });
+
+        res.json({ success: true, message: 'Handoff verification OTP generated!', pickup });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 
+// CUSTOMER VERIFY OTP (called by customer from their panel to confirm order receipt)
+// 
+export const customerVerifyOtp = async (req, res, next) => {
+    try {
+        const { otp } = req.body;
+        if (!otp) return res.status(400).json({ success: false, message: 'OTP is required' });
+
+        const pickup = await Pickup.findById(req.params.id).populate('rentalOrder');
+        if (!pickup) return res.status(404).json({ success: false, message: 'Pickup not found' });
+
+        if (pickup.otp !== otp) {
+            return res.status(400).json({ success: false, message: 'Invalid OTP. Please enter the correct code.' });
+        }
+
+        const order = await RentalOrder.findById(pickup.rentalOrder._id || pickup.rentalOrder);
+        if (!order) return res.status(404).json({ success: false, message: 'Associated order not found' });
+
+        pickup.isOtpVerified = true;
+        pickup.customerSignature = 'OTP Verified Handoff';
+        pickup.actualPickupDate = new Date();
+        pickup.status = 'Completed';
+        pickup.timeline.push({
+            status: 'Completed',
+            notes: 'Customer verified handoff OTP. Pickup marked Completed.',
+            updatedBy: req.user.id
+        });
+        await pickup.save();
+
+        await triggerEvent('PickupCompleted', { orderId: order._id, userId: req.user.id });
+
+        await ActivityLog.create({
+            user: req.user.id,
+            action: 'Customer Verify OTP',
+            module: 'Logistics',
+            details: `Customer verified pickup OTP for Order #${order.orderNumber}`
+        });
+
+        const updatedOrder = await RentalOrder.findById(order._id);
+
+        res.json({
+            success: true,
+            message: 'OTP verified successfully! Order is now confirmed and Active.',
             pickup,
             order: updatedOrder
         });

@@ -12,8 +12,10 @@ import {
     CalendarRange,
     Truck,
     RotateCcw,
+    MapPin,
     Settings,
-    Cpu
+    Cpu,
+    PlusCircle
 } from 'lucide-react';
 
 export const Sidebar = () => {
@@ -30,9 +32,12 @@ export const Sidebar = () => {
     const partnerLinks = [
         { label: 'Analytics Panel', path: '/partner', icon: Home },
         { label: 'Manage Products', path: '/partner/products', icon: ShoppingBag },
+        { label: 'Register Product', path: '/partner/add-product', icon: PlusCircle },
         { label: 'Rental Contracts', path: '/partner/rentals', icon: CalendarRange },
         { label: 'Logistics Pickups', path: '/partner/pickups', icon: Truck },
         { label: 'Logistics Returns', path: '/partner/returns', icon: RotateCcw },
+        { label: 'Logistics Maps', path: '/partner/maps', icon: MapPin },
+        { label: 'Manage Executive', path: '/partner/executives', icon: Users },
         { label: 'Customer Tickets', path: '/partner/tickets', icon: LifeBuoy },
         { label: 'Enterprise Suite', path: '/partner/enterprise', icon: Cpu },
         { label: 'Setting Profile', path: '/profile', icon: User },

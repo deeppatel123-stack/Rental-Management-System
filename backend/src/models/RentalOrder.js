@@ -47,6 +47,7 @@ const RentalOrderSchema = new mongoose.Schema({
     taxAmount: { type: Number, default: 0 },
     securityDepositTotal: { type: Number, required: true, default: 0 },
     discountAmount: { type: Number, default: 0 },
+    deliveryFee: { type: Number, default: 0 },
     lateFees: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true, default: 0 },
 

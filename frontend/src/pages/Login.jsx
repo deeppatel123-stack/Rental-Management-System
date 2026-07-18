@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
-import { Shield, KeyRound, AlertTriangle } from 'lucide-react';
+import { Shield, KeyRound, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Login = () => {
@@ -10,6 +10,7 @@ export const Login = () => {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -85,14 +86,27 @@ export const Login = () => {
                                 Forgot password?
                             </Link>
                         </div>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full glass-input"
-                            required
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full glass-input pr-10"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="w-4 h-4" />
+                                ) : (
+                                    <Eye className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-between py-1">
@@ -137,8 +151,8 @@ export const Login = () => {
                     <button
                         type="button"
                         onClick={() => {
-                            setEmail('deepp0261@gmail.com');
-                            setPassword('Deep@123');
+                            setEmail('bhaumikkothiya@gmail.com');
+                            setPassword('Mayank@123');
                         }}
                         className="py-2.5 px-2 bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-indigo-500 dark:text-indigo-400 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider"
                     >
@@ -147,7 +161,7 @@ export const Login = () => {
                     <button
                         type="button"
                         onClick={() => {
-                            setEmail('deepp0203@gmail.com');
+                            setEmail('patel10royal@gmail.com');
                             setPassword('Deep@123');
                         }}
                         className="py-2.5 px-2 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider"

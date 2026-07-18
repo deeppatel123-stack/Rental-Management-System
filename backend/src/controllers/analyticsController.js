@@ -26,11 +26,11 @@ export const getDashboardStats = async (req, res, next) => {
 
         // 3. Rentals counters
         const totalRentalsCount = await RentalOrder.countDocuments(ownerQuery);
-        const activeRentalsCount = await RentalOrder.countDocuments({ status: 'Active', ...ownerQuery });
+        const activeRentalsCount = await RentalOrder.countDocuments({ status: { $in: ['Active', 'Delivered'] }, ...ownerQuery });
 
         // 4. Overdue
         const overdueCount = await RentalOrder.countDocuments({
-            status: { $in: ['Active', 'Picked Up'] },
+            status: { $in: ['Active', 'Picked Up', 'Delivered'] },
             endDate: { $lt: now },
             ...ownerQuery
         });

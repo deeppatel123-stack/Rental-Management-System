@@ -13,7 +13,8 @@ import {
     resendVerification,
     getEmployeeList,
     getCustomerList,
-    deleteCustomer
+    deleteCustomer,
+    addExecutive
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
@@ -34,7 +35,8 @@ router.get('/me', protect, getMe);
 router.put('/profile', protect, upload.single('profileImage'), updateProfile);
 router.post('/address', protect, addAddress);
 router.delete('/address/:id', protect, deleteAddress);
-router.get('/employees', protect, authorize('Super Admin'), getEmployeeList);
+router.get('/employees', protect, authorize('Super Admin', 'Rental Partner'), getEmployeeList);
+router.post('/employees', protect, authorize('Super Admin', 'Rental Partner'), addExecutive);
 router.get('/partners', protect, authorize('Super Admin'), getEmployeeList);
 router.get('/customers', protect, authorize('Super Admin'), getCustomerList);
 router.delete('/customers/:id', protect, authorize('Super Admin'), deleteCustomer);

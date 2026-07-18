@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { UserCheck, AlertTriangle } from 'lucide-react';
+import { UserCheck, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const Signup = () => {
@@ -12,6 +12,7 @@ export const Signup = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [phone, setPhone] = useState('');
     const [role, setRole] = useState('Customer');
     const [error, setError] = useState('');
@@ -118,15 +119,28 @@ export const Signup = () => {
 
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Security Password *</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Min 6 characters"
-                            className="w-full glass-input"
-                            required
-                            minLength={6}
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Min 6 characters"
+                                className="w-full glass-input pr-10"
+                                required
+                                minLength={6}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-205 focus:outline-none"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="w-4 h-4" />
+                                ) : (
+                                    <Eye className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     <button

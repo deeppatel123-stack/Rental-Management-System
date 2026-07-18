@@ -13,7 +13,7 @@ export const Checkout = () => {
     const { cartItems, startDate, endDate, totals, clearCart } = useCart();
 
 
-    const { deliveryType = 'Store Pickup', shippingAddress = {}, paymentMethod = 'Card' } = location.state || {};
+    const { deliveryType = 'Store Pickup', shippingAddress = {}, paymentMethod = 'Card', deliveryFee = 0 } = location.state || {};
 
     const [signature, setSignature] = useState('');
     const [agreePolicy, setAgreePolicy] = useState(false);
@@ -61,7 +61,7 @@ export const Checkout = () => {
     const finalTax = totals.subTotal > 0
         ? Math.round(((finalSubtotal / totals.subTotal) * (totals.preDiscountTax || totals.tax)) * 100) / 100
         : 0;
-    const finalGrandTotal = finalSubtotal + finalTax + totals.securityHold;
+    const finalGrandTotal = finalSubtotal + finalTax + totals.securityHold + (deliveryFee || 0);
 
     const handlePayAndConfirm = async (e) => {
         e.preventDefault();
@@ -82,6 +82,7 @@ export const Checkout = () => {
                 deliveryType,
                 shippingAddress,
                 paymentMethod,
+                deliveryFee,
                 couponCode: appliedCoupon ? appliedCoupon.code : undefined
             });
 
@@ -262,13 +263,19 @@ export const Checkout = () => {
                                 </div>
                             )}
                             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                <span>Estimated Tax:</span>
+                                <span>Sales Tax ({totals.appliedTaxRate || 8}%):</span>
                                 <span className="font-semibold text-slate-900 dark:text-white">${finalTax.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-slate-600 dark:text-slate-400">
                                 <span>Security Deposit (Refundable):</span>
                                 <span className="font-semibold text-slate-900 dark:text-white">${totals.securityHold.toFixed(2)}</span>
                             </div>
+                            {deliveryType === 'Delivery' && (
+                                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                    <span>Courier {deliveryType} Fee:</span>
+                                    <span className="font-semibold text-slate-700 dark:text-slate-200">+${deliveryFee.toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between font-bold text-slate-900 dark:text-white text-sm pt-2 border-t border-slate-250/20">
                                 <span>Total checkout hold:</span>
                                 <span className="text-emerald-600 dark:text-emerald-400">${finalGrandTotal.toFixed(2)}</span>

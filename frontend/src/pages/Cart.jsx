@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Trash2, Plus, Minus, ArrowRight, Truck, Store, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { GoogleDistanceMap } from '../components/GoogleDistanceMap';
 
 export const Cart = () => {
     const navigate = useNavigate();
@@ -18,9 +19,28 @@ export const Cart = () => {
         city: '',
         state: '',
         zipCode: '',
-        country: ''
+        country: 'USA'
     });
     const [paymentMethod, setPaymentMethod] = useState('Card');
+    const [deliveryFee, setDeliveryFee] = useState(0);
+
+    const handleDistanceCalculated = ({ deliveryFee }) => {
+        setDeliveryFee(deliveryFee);
+    };
+
+    // Auto-populate address from logged-in customer's default address profile data
+    useEffect(() => {
+        if (user?.addresses && user.addresses.length > 0) {
+            const defAddr = user.addresses.find(a => a.isDefault) || user.addresses[0];
+            setShippingAddress({
+                street: defAddr.street || '',
+                city: defAddr.city || '',
+                state: defAddr.state || '',
+                zipCode: defAddr.zipCode || '',
+                country: defAddr.country || 'USA'
+            });
+        }
+    }, [user]);
 
     const handleNext = () => {
         if (!user) {
@@ -29,7 +49,7 @@ export const Cart = () => {
             return;
         }
 
-        navigate('/checkout', { state: { deliveryType, shippingAddress, paymentMethod } });
+        navigate('/checkout', { state: { deliveryType, shippingAddress, paymentMethod, deliveryFee: deliveryType === 'Delivery' ? deliveryFee : 0 } });
     };
 
     if (cartItems.length === 0) {
@@ -145,7 +165,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.street}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })}
-                                            placeholder="e.g. 129 Baker Street"
+                                            placeholder="e.g. 742 Evergreen Terrace"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
@@ -155,7 +175,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.city}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                                            placeholder="e.g. New York"
+                                            placeholder="e.g. Springfield"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
@@ -165,7 +185,7 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.state}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
-                                            placeholder="e.g. NY"
+                                            placeholder="e.g. IL"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
@@ -175,11 +195,17 @@ export const Cart = () => {
                                             type="text"
                                             value={shippingAddress.zipCode}
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, zipCode: e.target.value })}
-                                            placeholder="e.g. 10001"
+                                            placeholder="e.g. 62704"
                                             className="w-full glass-input text-xs"
                                         />
                                     </div>
                                 </div>
+                                <GoogleDistanceMap
+                                    shippingAddress={shippingAddress}
+                                    deliveryType={deliveryType}
+                                    onDistanceCalculated={handleDistanceCalculated}
+                                    calculationOnly={true}
+                                />
                             </div>
                         )}
                     </div>
@@ -226,17 +252,25 @@ export const Cart = () => {
                                 <span className="font-semibold text-slate-700 dark:text-slate-200">${totals.subTotal.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-slate-500">
-                                <span>Sales Tax (8% estimation):</span>
+                                <span>Sales Tax ({totals.appliedTaxRate || 8}%):</span>
                                 <span className="font-semibold text-slate-700 dark:text-slate-200">${totals.tax.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between text-slate-500 border-b border-slate-100 dark:border-slate-850 pb-3">
+                            <div className="flex justify-between text-slate-500">
                                 <span>Security Deposit Hold:</span>
                                 <span className="font-bold text-emerald-600 dark:text-emerald-450">${totals.securityHold.toFixed(2)}</span>
                             </div>
-
+                            {deliveryType === 'Delivery' && (
+                                <div className="flex justify-between text-slate-500">
+                                    <span>Courier Delivery Fee:</span>
+                                    <span className="font-semibold text-emerald-600 dark:text-emerald-450">+${deliveryFee.toFixed(2)}</span>
+                                </div>
+                            )}
+                            <hr className="border-slate-100 dark:border-slate-850 pb-1" />
                             <div className="flex justify-between text-sm font-black pt-1">
                                 <span>Estimated Total:</span>
-                                <span className="text-slate-900 dark:text-white">${totals.grandTotal.toFixed(2)}</span>
+                                <span className="text-slate-905 dark:text-white">
+                                    ${(totals.grandTotal + (deliveryType === 'Delivery' ? deliveryFee : 0)).toFixed(2)}
+                                </span>
                             </div>
                         </div>
 

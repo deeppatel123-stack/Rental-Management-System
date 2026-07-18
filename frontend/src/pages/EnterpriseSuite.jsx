@@ -27,6 +27,8 @@ export const EnterpriseSuite = () => {
     const [coupons, setCoupons] = useState([]);
     const [auditLogs, setAuditLogs] = useState([]);
     const [products, setProducts] = useState([]);
+    const [deliveryOrders, setDeliveryOrders] = useState([]);
+    const [employees, setEmployees] = useState([]);
 
     // Form inputs states
     const [newQuote, setNewQuote] = useState({ customerName: '', customerEmail: '', productId: '', quantity: 1, startDate: '', endDate: '' });
@@ -76,6 +78,30 @@ export const EnterpriseSuite = () => {
             } else if (activeTab === 'logistics') {
                 const res = await api.get('/enterprise/drivers');
                 if (res.data?.success) setDrivers(res.data.assignments);
+
+                // Fetch delivery orders
+                const ordersRes = await api.get('/rentals');
+                if (ordersRes.data?.success) {
+                    const filtered = (ordersRes.data.orders || []).filter(
+                        o => o.deliveryType === 'Delivery'
+                    );
+                    setDeliveryOrders(filtered);
+                }
+
+                // Fetch employees for select list
+                try {
+                    const empRes = await api.get('/auth/employees');
+                    if (empRes.data?.success) {
+                        setEmployees(empRes.data.data || empRes.data.employees || []);
+                    }
+                } catch (e) {
+                    setEmployees([
+                        { _id: user?.id || 'partner-id', name: `${user?.name || 'Partner Executive'} (Me)` },
+                        { _id: 'emp-101', name: 'Hiren (Logistics Staff)' },
+                        { _id: 'emp-102', name: 'Raj Kumar (Dispatch Hub)' },
+                        { _id: 'emp-103', name: 'Arun Patel (Driver)' }
+                    ]);
+                }
             } else if (activeTab === 'coupons') {
                 const res = await api.get('/enterprise/coupons');
                 if (res.data?.success) setCoupons(res.data.coupons);
@@ -202,6 +228,8 @@ export const EnterpriseSuite = () => {
     // Routing Mock optimization assignment
     const handleNewDriverSubmit = async (e) => {
         e.preventDefault();
+        if (!newDriver.driverId) return showToast('Please select/specify a driver Executive.', 'warning');
+        if (!newDriver.rentalOrder) return showToast('Please select a rental order to assign.', 'warning');
         try {
             const payload = {
                 driverId: newDriver.driverId,
@@ -214,11 +242,17 @@ export const EnterpriseSuite = () => {
             const res = await api.post('/enterprise/drivers', payload);
             if (res.data?.success) {
                 showToast('Driver Route Optimized stop assigned!', 'success');
-                setDrivers([res.data.assignment, ...drivers]);
+                // Refresh assignments directly from db log
+                try {
+                    const listRes = await api.get('/enterprise/drivers');
+                    if (listRes.data?.success) setDrivers(listRes.data.assignments);
+                } catch {
+                    setDrivers([res.data.assignment, ...drivers]);
+                }
                 setNewDriver({ driverId: '', address: '', rentalOrder: '' });
             }
         } catch (err) {
-            showToast('Error assigning driver path.', 'error');
+            showToast(err.response?.data?.message || 'Error assigning driver path.', 'error');
         }
     };
 
@@ -598,18 +632,56 @@ export const EnterpriseSuite = () => {
                                 <h3 className="text-sm font-extrabold">Optimize driver assignments stops</h3>
                                 <form onSubmit={handleNewDriverSubmit} className="space-y-3.5 text-xs">
                                     <div className="space-y-1">
-                                        <span className="text-[10px] text-slate-450 block">Driver (Employee/Staff)</span>
-                                        <input
-                                            type="text"
+                                        <span className="text-[10px] text-slate-405 block font-bold text-indigo-400">Driver / Dispatch Exec</span>
+                                        <select
                                             required
                                             value={newDriver.driverId}
                                             onChange={e => setNewDriver({ ...newDriver, driverId: e.target.value })}
                                             className="w-full glass-input"
-                                            placeholder="Employee name or ID"
-                                        />
+                                        >
+                                            <option value="">-- Select Dispatch Driver --</option>
+                                            {employees.map(emp => (
+                                                <option key={emp._id} value={emp._id}>
+                                                    {emp.name}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <span className="text-[10px] text-slate-450 block">Stops Address Destination</span>
+                                        <span className="text-[10px] text-slate-405 block font-bold text-indigo-400">Select Active Rental Contract</span>
+                                        <select
+                                            required
+                                            value={newDriver.rentalOrder}
+                                            onChange={e => {
+                                                const orderId = e.target.value;
+                                                const selectedOrder = deliveryOrders.find(o => o._id === orderId);
+                                                let addrStr = '';
+                                                if (selectedOrder && selectedOrder.shippingAddress) {
+                                                    const sa = selectedOrder.shippingAddress;
+                                                    addrStr = `${sa.street || ''}, ${sa.city || ''}, ${sa.state || ''}`.trim().replace(/^, |, $/, '');
+                                                }
+                                                setNewDriver({
+                                                    ...newDriver,
+                                                    rentalOrder: orderId,
+                                                    address: addrStr || newDriver.address
+                                                });
+                                            }}
+                                            className="w-full glass-input"
+                                        >
+                                            <option value="">-- Select Rental Delivery Order --</option>
+                                            {deliveryOrders.length === 0 ? (
+                                                <option disabled value="">No active delivery orders found</option>
+                                            ) : (
+                                                deliveryOrders.map(o => (
+                                                    <option key={o._id} value={o._id}>
+                                                        {o.orderNumber} - {o.customer?.name || 'Customer'}
+                                                    </option>
+                                                ))
+                                            )}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] text-slate-450 block">Stops Address Destination (Auto-filled)</span>
                                         <input
                                             type="text"
                                             required

@@ -35,12 +35,10 @@ const StatusBadge = ({ status }) => {
 const PICKUP_STEPS = [
     { label: 'Pending', step: 'Pending', icon: Package },
     { label: 'Assigned', step: 'Assigned', icon: UserCheck },
-    { label: 'Scheduled', step: 'Scheduled', icon: Calendar },
-    { label: 'On The Way', step: 'On The Way', icon: Navigation },
-    { label: 'Verified', step: 'OTP Verified', icon: ShieldCheck },
     { label: 'Completed', step: 'Completed', icon: CheckCircle2 },
 ];
 const STEP_ORDER = ['Pending', 'Assigned', 'Scheduled', 'On The Way', 'OTP Verified', 'QR Verified', 'Picked Up', 'Completed'];
+
 
 const WorkflowStepper = ({ currentStatus }) => {
     const currentRank = STEP_ORDER.indexOf(currentStatus);
@@ -121,15 +119,12 @@ export const PickupWorkflow = () => {
         try {
             const res = await api.get('/auth/employees');
             if (res.data.success) {
-                setEmployees(res.data.data || res.data.employees || []);
+                // Only show Delivery Executives in the assignment dropdown, not Rental Partners
+                const all = res.data.data || res.data.employees || [];
+                setEmployees(all.filter(emp => emp.role === 'Delivery Executive'));
             }
         } catch {
-            // Fallback mock list for sandboxing
-            setEmployees([
-                { _id: 'emp-1', name: 'Raj Kumar (Logistics)', email: 'raj@rental.com' },
-                { _id: 'emp-2', name: 'Priya Sharma (Executive)', email: 'priya@rental.com' },
-                { _id: 'emp-3', name: 'Arun Patel (Driver)', email: 'arun@rental.com' },
-            ]);
+            setEmployees([]);
         }
     }, []);
 
@@ -239,6 +234,22 @@ export const PickupWorkflow = () => {
         } catch (err) {
             showToast('Failed to update status', 'error');
         } finally { setActionLoading(false); }
+    };
+
+    const generateHandoffOtp = async () => {
+        setActionLoading(true);
+        try {
+            const res = await api.post(`/pickups/${selectedPickup._id}/generate-otp`);
+            if (res.data.success) {
+                showToast('Handoff OTP code generated successfully!', 'success');
+                selectPickupItem(res.data.pickup);
+                fetchPickups();
+            }
+        } catch (err) {
+            showToast('Failed to generate handoff OTP', 'error');
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const verifyOtpCode = async () => {
@@ -610,26 +621,7 @@ export const PickupWorkflow = () => {
                                 {/* LEFT: Actions */}
                                 <div className="lg:col-span-2 space-y-5">
 
-                                    {/* Direct ERP Action button */}
-                                    {isAdmin && !['Completed', 'Cancelled'].includes(selectedPickup.status) && (
-                                        <div className="p-5 border border-emerald-500/35 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-2xl space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <h4 className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Enterprise ERP Quick Handover</h4>
-                                                    <p className="text-[10px] text-slate-400">Complete logistics pickup immediately and mark the rental order as Active with one-click.</p>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={handleSimpleConfirmPickup}
-                                                disabled={actionLoading}
-                                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
-                                            >
-                                                {actionLoading ? 'Processing Handover...' : '⚡ Confirm Handover & Complete Pickup'}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/*  STEP: ASSIGN EXECUTIVE (Pending)  */}
+                                    {/*  STEP 1: ASSIGN EXECUTIVE (status = Pending) */}
                                     {isAdmin && selectedPickup.status === 'Pending' && (
                                         <form onSubmit={handleAssignSubmit} className="glass-panel p-6 rounded-2xl border border-brand-500/15 space-y-4">
                                             <div className="flex items-center gap-2">
@@ -637,8 +629,8 @@ export const PickupWorkflow = () => {
                                                     <UserCheck className="w-4 h-4 text-brand-500" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 1 · Assign Pickup Executive</h4>
-                                                    <p className="text-[10px] text-slate-400">Select an executive to handle this pickup delivery.</p>
+                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 1 · Assign Delivery Executive</h4>
+                                                    <p className="text-[10px] text-slate-400">Select a delivery executive from your registered fleet.</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-3">
@@ -657,193 +649,40 @@ export const PickupWorkflow = () => {
                                         </form>
                                     )}
 
-                                    {/*  STEP: SCHEDULE DATE & TIME (Assigned/Scheduled)  */}
-                                    {isAdmin && ['Assigned', 'Scheduled'].includes(selectedPickup.status) && (
-                                        <form onSubmit={handleScheduleSubmit} className="glass-panel p-6 rounded-2xl border border-purple-500/15 space-y-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 bg-purple-500/15 rounded-xl flex items-center justify-center">
-                                                    <Calendar className="w-4 h-4 text-purple-500" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 2 · Schedule Date & Time</h4>
-                                                    <p className="text-[10px] text-slate-400">Set the pickup appointment. OTP & QR Code will be auto-generated.</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] text-slate-400 font-bold">Date</label>
-                                                    <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)}
-                                                        className="w-full glass-input text-xs" required />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] text-slate-400 font-bold">Time</label>
-                                                    <input type="time" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)}
-                                                        className="w-full glass-input text-xs" required />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] text-slate-400 font-bold">Vehicle Details</label>
-                                                <input type="text" value={vehicleDetails} onChange={e => setVehicleDetails(e.target.value)}
-                                                    className="w-full glass-input text-xs" placeholder="e.g. Toyota Hiace GJ-01-XX-9999" required />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] text-slate-400 font-bold">Notes (optional)</label>
-                                                <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-                                                    className="w-full glass-input text-xs" placeholder="e.g. Building 3, Ring Bell twice" />
-                                            </div>
-                                            <button type="submit" disabled={actionLoading}
-                                                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold disabled:opacity-50">
-                                                {actionLoading ? 'Scheduling...' : selectedPickup.status === 'Scheduled' ? '📅 Update Schedule' : '📅 Schedule & Generate OTP/QR'}
-                                            </button>
-                                        </form>
-                                    )}
-
-                                    {/*  OTP & QR DISPLAY (after scheduling)  */}
-                                    {['Scheduled', 'On The Way'].includes(selectedPickup.status) && selectedPickup.otp && (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2">
-                                                <p className="text-[10px] font-black uppercase text-emerald-500 flex items-center gap-1">
-                                                    <ShieldCheck className="w-3.5 h-3.5" /> Customer OTP
-                                                </p>
-                                                <div className="text-2xl font-black font-mono tracking-widest text-emerald-400 text-center py-2">
-                                                    {selectedPickup.otp}
-                                                </div>
-                                                <p className="text-[9px] text-slate-400 text-center">Share this code with your customer</p>
-                                            </div>
-                                            {selectedPickup.qrCodeData && (
-                                                <div className="p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl space-y-2 flex flex-col items-center">
-                                                    <p className="text-[10px] font-black uppercase text-indigo-400 flex items-center gap-1">
-                                                        <QrCode className="w-3.5 h-3.5" /> Pickup QR Code
-                                                    </p>
-                                                    <img src={selectedPickup.qrCodeData} alt="Pickup QR" className="w-24 h-24 rounded-lg" />
-                                                    <p className="text-[9px] text-slate-400">Scan to verify pickup</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/*  STEP: MARK ON THE WAY (Scheduled)  */}
-                                    {isAdmin && selectedPickup.status === 'Scheduled' && (
-                                        <div className="p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 bg-amber-500/15 rounded-xl flex items-center justify-center">
-                                                    <Navigation className="w-4 h-4 text-amber-500" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 3 · Depart for Pickup</h4>
-                                                    <p className="text-[10px] text-slate-400">Tap when executive has left the warehouse.</p>
-                                                </div>
-                                            </div>
-                                            <button onClick={markOnTheWay} disabled={actionLoading}
-                                                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 disabled:opacity-50">
-                                                <Navigation className="w-4 h-4 animate-pulse" />
-                                                {actionLoading ? 'Updating...' : 'Mark On The Way'}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/*  STEP: OTP / QR VERIFY (On The Way)  */}
-                                    {isAdmin && selectedPickup.status === 'On The Way' && (
-                                        <div className="glass-panel p-6 rounded-2xl border border-cyan-500/15 space-y-5">
+                                    {/*  STEP 2: CONFIRM DELIVERY — customer shares OTP with executive */}
+                                    {isAdmin && ['Assigned', 'Scheduled', 'On The Way', 'OTP Verified'].includes(selectedPickup.status) && (
+                                        <div className="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-4">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-8 h-8 bg-cyan-500/15 rounded-xl flex items-center justify-center">
                                                     <ShieldCheck className="w-4 h-4 text-cyan-500" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 4 · Verify OTP or QR Code</h4>
-                                                    <p className="text-[10px] text-slate-400">Customer must provide OTP or show QR Code to proceed.</p>
+                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 2 · Confirm Customer Handoff</h4>
+                                                    <p className="text-[10px] text-slate-400">Customer sees the OTP in their Order History. Ask them to share it, then enter below.</p>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                <div className="space-y-3">
-                                                    <p className="text-[10px] font-bold text-slate-500">Option A: Enter OTP</p>
-                                                    <div className="flex gap-2">
-                                                        <input type="text" value={otpValue} onChange={e => setOtpValue(e.target.value)}
-                                                            className="flex-1 text-center font-mono font-bold tracking-widest text-sm glass-input"
-                                                            placeholder="••••••" maxLength={6} />
-                                                        <button onClick={verifyOtpCode} disabled={actionLoading}
-                                                            className="px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold disabled:opacity-50">
-                                                            {actionLoading ? '...' : 'Verify'}
-                                                        </button>
-                                                    </div>
-                                                    <p className="text-[9px] text-slate-500 italic">
-                                                        Dev/Sandbox OTP: <span className="font-mono text-emerald-400">{selectedPickup.otp}</span>
-                                                    </p>
+
+                                            {/* Show the active OTP for reference */}
+                                            {selectedPickup.otp && (
+                                                <div className="p-3 bg-emerald-500/5 border border-emerald-500/15 rounded-xl flex items-center justify-between">
+                                                    <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                                                        <ShieldCheck className="w-3 h-3" /> Customer's OTP (for reference)
+                                                    </span>
+                                                    <span className="font-mono font-black text-emerald-400 text-sm tracking-widest">{selectedPickup.otp}</span>
                                                 </div>
-                                                <div className="border-l border-slate-200/50 dark:border-slate-800/10 pl-5 space-y-3">
-                                                    <p className="text-[10px] font-bold text-slate-500">Option B: Scan QR Code</p>
-                                                    <button onClick={verifyQrCode} disabled={actionLoading}
-                                                        className="w-full py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
-                                                        <Scan className="w-4 h-4 animate-pulse" />
-                                                        {actionLoading ? 'Verifying...' : 'Simulate QR Scan'}
-                                                    </button>
-                                                </div>
+                                            )}
+
+                                            <div className="flex gap-2">
+                                                <input type="text" value={otpValue} onChange={e => setOtpValue(e.target.value)}
+                                                    className="flex-1 text-center font-mono font-bold tracking-widest text-sm glass-input"
+                                                    placeholder="Enter OTP shared by customer" maxLength={6} />
+                                                <button onClick={verifyOtpCode} disabled={actionLoading}
+                                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 whitespace-nowrap">
+                                                    {actionLoading ? '...' : '✅ Confirm Delivery'}
+                                                </button>
                                             </div>
+                                            <p className="text-[9px] text-slate-500 italic">On success → Pickup <strong>Completed</strong> + Order becomes <strong>Active</strong>.</p>
                                         </div>
-                                    )}
-
-                                    {/*  STEP: CHECKLIST + SIGNATURE (OTP/QR Verified / Picked Up)  */}
-                                    {isAdmin && ['OTP Verified', 'QR Verified', 'Picked Up'].includes(selectedPickup.status) && (
-                                        <form onSubmit={submitConfirmPickup} className="glass-panel p-6 rounded-2xl border border-emerald-500/15 space-y-5">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-                                                    <ClipboardList className="w-4 h-4 text-emerald-500" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-xs font-black text-slate-700 dark:text-white uppercase">Step 5 · Product Checklist & Signature</h4>
-                                                    <p className="text-[10px] text-slate-400">Scan all serial numbers and get customer signature.</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Checklist items */}
-                                            <div className="space-y-3">
-                                                {checklistItems.map((item, idx) => (
-                                                    <div key={idx} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4">
-                                                        <div className="flex-1">
-                                                            <p className="text-xs font-extrabold text-slate-200">{item.productName}</p>
-                                                            {item.serialNumber ? (
-                                                                <span className="text-[9px] font-mono bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
-                                                                    ✓ SN: {item.serialNumber}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-[9px] font-mono text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/10">
-                                                                    ⚠ Pending Serial Scan
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <button type="button" onClick={() => scanSerialNumber(idx)}
-                                                            className={`px-3.5 py-2.5 border text-[10px] font-bold rounded-xl flex items-center gap-1.5 transition-all ${item.isVerified
-                                                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                                                : 'bg-brand-500/10 border-brand-500/20 text-brand-400 hover:bg-brand-500/20'
-                                                                }`}>
-                                                            <Scan className="w-3.5 h-3.5" />
-                                                            {item.isVerified ? 'Re-Scan' : 'Scan Barcode'}
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* Digital Signature */}
-                                            <div className="space-y-3 border-t border-slate-200/50 dark:border-slate-800/30 pt-4">
-                                                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                                                    <PenLine className="w-4 h-4 text-emerald-500" /> Customer Digital Signature
-                                                </label>
-                                                <div className="aspect-[4/1] bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center">
-                                                    {signatureTyped ? (
-                                                        <span className="font-serif italic text-xl tracking-widest text-purple-400">{signatureTyped}</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-slate-400">Signature preview area</span>
-                                                    )}
-                                                </div>
-                                                <input type="text" value={signatureTyped} onChange={e => setSignatureTyped(e.target.value)}
-                                                    className="w-full glass-input text-xs" placeholder="Type customer's full legal name as signature" required />
-                                            </div>
-
-                                            <button type="submit" disabled={actionLoading}
-                                                className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl text-sm font-bold uppercase tracking-wide shadow-lg disabled:opacity-50">
-                                                {actionLoading ? '⏳ Processing...' : '✅ Complete Pickup & Activate Rental'}
-                                            </button>
-                                        </form>
                                     )}
 
                                     {/*  COMPLETED STATE  */}

@@ -12,9 +12,9 @@ import Product from '../models/Product.js';
 import { generateQRCode } from '../services/qrService.js';
 import { triggerEvent } from '../services/eventService.js';
 
-// ─────────────────────────────────────────────
+
 // GET ALL RETURNS (role-filtered)
-// ─────────────────────────────────────────────
+
 export const getReturns = async (req, res, next) => {
     try {
         const query = {};
@@ -38,9 +38,9 @@ export const getReturns = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // GET SINGLE RETURN BY ID
-// ─────────────────────────────────────────────
+
 export const getReturnById = async (req, res, next) => {
     try {
         const returnDoc = await Return.findById(req.params.id)
@@ -65,9 +65,9 @@ export const getReturnById = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // ASSIGN RETURN EXECUTIVE
-// ─────────────────────────────────────────────
+
 export const assignReturnExecutive = async (req, res, next) => {
     try {
         const { employeeId } = req.body;
@@ -81,12 +81,12 @@ export const assignReturnExecutive = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized partner access' });
         }
 
-        // Return can only be processed for Active orders
+        // Return can only be processed for Active/Delivered/Return Requested/Overdue orders
         const order = returnDoc.rentalOrder;
-        if (order && !['Active', 'Return Requested', 'Overdue'].includes(order.status)) {
+        if (order && !['Active', 'Delivered', 'Return Requested', 'Overdue'].includes(order.status)) {
             return res.status(400).json({
                 success: false,
-                message: `Return can only be initiated for Active rentals. Current order status: ${order.status}`
+                message: `Return can only be initiated for Active or Delivered rentals. Current order status: ${order.status}`
             });
         }
 
@@ -124,9 +124,9 @@ export const assignReturnExecutive = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // SCHEDULE RETURN DATE (generates QR)
-// ─────────────────────────────────────────────
+
 export const scheduleReturn = async (req, res, next) => {
     try {
         const { scheduledDate, notes } = req.body;
@@ -181,9 +181,9 @@ export const scheduleReturn = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // UPDATE RETURN STATUS
-// ─────────────────────────────────────────────
+
 export const updateReturnStatus = async (req, res, next) => {
     try {
         const { status, notes } = req.body;
@@ -223,9 +223,9 @@ export const updateReturnStatus = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // VERIFY RETURN OTP
-// ─────────────────────────────────────────────
+
 export const verifyReturnOtp = async (req, res, next) => {
     try {
         const { otp } = req.body;
@@ -262,9 +262,9 @@ export const verifyReturnOtp = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // VERIFY RETURN QR CODE
-// ─────────────────────────────────────────────
+
 export const verifyReturnQr = async (req, res, next) => {
     try {
         const returnDoc = await Return.findById(req.params.id);
@@ -295,9 +295,9 @@ export const verifyReturnQr = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // START INSPECTION (move to Inspection status)
-// ─────────────────────────────────────────────
+
 export const startInspection = async (req, res, next) => {
     try {
         const returnDoc = await Return.findById(req.params.id);
@@ -326,9 +326,9 @@ export const startInspection = async (req, res, next) => {
     }
 };
 
-// ─────────────────────────────────────────────
+
 // CONFIRM RETURN (full business logic: penalty + deposit + inventory + invoice)
-// ─────────────────────────────────────────────
+
 export const confirmReturn = async (req, res, next) => {
     try {
         const { checklist, notes, overallCondition, customerSignature } = req.body;

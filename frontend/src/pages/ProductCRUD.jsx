@@ -1,15 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { api, useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Plus, Trash2, Edit3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProductCRUD = () => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
     const { showToast } = useToast();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [deleteTargetId, setDeleteTargetId] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const handleAddNewProductClick = () => {
+        const path = user?.role === 'Super Admin' ? '/admin/add-product' : '/partner/add-product';
+        navigate(path);
+    };
 
 
     const [name, setName] = useState('');
@@ -44,13 +54,13 @@ export const ProductCRUD = () => {
     }, []);
 
     useEffect(() => {
-        if (showModal) {
+        if (showModal || showDeleteConfirm) {
             document.body.classList.add('overflow-hidden');
         } else {
             document.body.classList.remove('overflow-hidden');
         }
         return () => document.body.classList.remove('overflow-hidden');
-    }, [showModal]);
+    }, [showModal, showDeleteConfirm]);
 
     const openAddModal = () => {
         setEditingId(null);
@@ -138,13 +148,22 @@ export const ProductCRUD = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Confirm deletion of product catalog listing? This removes physical inventories too.')) return;
+    const handleDelete = (id) => {
+        setDeleteTargetId(id);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteProduct = async () => {
+        if (!deleteTargetId) return;
         try {
-            await api.delete(`/products/${id}`);
+            await api.delete(`/products/${deleteTargetId}`);
+            showToast('Product catalog listing deleted successfully!', 'success');
             fetchCatalog();
         } catch (err) {
-            showToast('Error deletion catalog.', 'error');
+            showToast(err.response?.data?.message || 'Error occurred deleting product catalog.', 'error');
+        } finally {
+            setShowDeleteConfirm(false);
+            setDeleteTargetId(null);
         }
     };
 
@@ -153,14 +172,8 @@ export const ProductCRUD = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-extrabold tracking-tight">System Product Catalog</h2>
-                    <p className="text-xs text-slate-500">Add physical inventory classifications and customize pricing matrix brackets.</p>
+                    <p className="text-xs text-slate-500">Edit physical inventory classifications and customize pricing matrix brackets.</p>
                 </div>
-                <button
-                    onClick={openAddModal}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all shadow-md"
-                >
-                    <Plus className="w-4 h-4" /> Add Classified Product
-                </button>
             </div>
 
 
@@ -176,6 +189,7 @@ export const ProductCRUD = () => {
                                 <th className="px-5 py-3.5">Category</th>
                                 <th className="px-5 py-3.5">Pricing / Day</th>
                                 <th className="px-5 py-3.5">Escrow hold</th>
+                                <th className="px-5 py-3.5">Tax rate</th>
                                 <th className="px-5 py-3.5 text-center">Stock status</th>
                                 <th className="px-5 py-3.5 text-right font-black">Controls</th>
                             </tr>
@@ -196,18 +210,21 @@ export const ProductCRUD = () => {
                                     <td className="px-5 py-4 text-slate-500">{prod.category}</td>
                                     <td className="px-5 py-4 font-bold">${prod.priceRate.daily}</td>
                                     <td className="px-5 py-4 text-emerald-600 dark:text-emerald-400 font-bold">${prod.securityDeposit}</td>
+                                    <td className="px-5 py-4 font-semibold text-slate-500 font-mono">{prod.taxRate !== undefined ? prod.taxRate : 8}%</td>
                                     <td className="px-5 py-4 text-center">
                                         <span className="text-[10px] bg-brand-500/10 text-brand-655 font-extrabold px-2 py-0.5 rounded">
                                             {prod.stock?.available ?? 0} Avail / {prod.stock?.total ?? 0} Total
                                         </span>
                                     </td>
                                     <td className="px-5 py-4 text-right space-x-2">
-                                        <button
-                                            onClick={() => openEditModal(prod)}
-                                            className="p-1 text-slate-400 hover:text-brand-500"
-                                        >
-                                            <Edit3 className="w-4 h-4 inline" />
-                                        </button>
+                                        {user?.role !== 'Super Admin' && (
+                                            <button
+                                                onClick={() => openEditModal(prod)}
+                                                className="p-1 text-slate-400 hover:text-brand-500"
+                                            >
+                                                <Edit3 className="w-4 h-4 inline" />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleDelete(prod._id)}
                                             className="p-1 text-slate-400 hover:text-red-500"
@@ -224,7 +241,7 @@ export const ProductCRUD = () => {
 
 
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden animate-fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent overflow-hidden animate-fade-in">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 15 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -423,6 +440,43 @@ export const ProductCRUD = () => {
                                 </button>
                             </div>
                         </form>
+                    </motion.div>
+                </div>
+            )}
+
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent overflow-hidden animate-fade-in">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="w-full max-w-sm bg-white dark:bg-slate-900 glass-panel p-6 rounded-[2rem] shadow-2xl relative z-50 text-center space-y-4 border border-slate-205 dark:border-slate-800/10"
+                    >
+                        <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-2 animate-bounce">
+                            <Trash2 className="w-6 h-6" />
+                        </div>
+                        <h3 className="font-extrabold text-base text-slate-800 dark:text-white">Confirm Deletion</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Confirm deletion of product catalog listing? This removes physical inventories too.
+                        </p>
+                        <div className="flex gap-3 justify-center pt-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowDeleteConfirm(false);
+                                    setDeleteTargetId(null);
+                                }}
+                                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/50 text-xs font-bold rounded-xl text-slate-500 dark:text-slate-300 transition-colors border border-transparent dark:border-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDeleteProduct}
+                                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-550/15"
+                            >
+                                Delete
+                            </button>
+                        </div>
                     </motion.div>
                 </div>
             )}

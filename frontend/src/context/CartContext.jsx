@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from './AuthContext';
 
 const CartContext = createContext();
 
@@ -7,7 +8,6 @@ export const CartProvider = ({ children }) => {
         const saved = localStorage.getItem('cart');
         return saved ? JSON.parse(saved) : [];
     });
-
 
     const [startDate, setStartDate] = useState(() => {
         const tomorrow = new Date();
@@ -19,6 +19,46 @@ export const CartProvider = ({ children }) => {
         dayAfter.setDate(dayAfter.getDate() + 3);
         return dayAfter.toISOString().split('T')[0];
     });
+
+    useEffect(() => {
+        const refreshCartPrices = async () => {
+            if (!cartItems || cartItems.length === 0) return;
+            try {
+                let changed = false;
+                const updatedItems = await Promise.all(cartItems.map(async (item) => {
+                    try {
+                        const res = await api.get(`/products/${item._id}`);
+                        if (res.data?.success && res.data.product) {
+                            const prod = res.data.product;
+                            const dbTax = prod.taxRate !== undefined ? prod.taxRate : 8;
+                            const dbRate = prod.priceRate.daily;
+                            const dbDeposit = prod.securityDeposit;
+                            if (item.taxRate !== dbTax || item.dailyRate !== dbRate || item.securityDeposit !== dbDeposit) {
+                                changed = true;
+                                return {
+                                    ...item,
+                                    dailyRate: dbRate,
+                                    securityDeposit: dbDeposit,
+                                    taxRate: dbTax
+                                };
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed refreshing cart item data:', item._id, e);
+                    }
+                    return item;
+                }));
+
+                if (changed) {
+                    setCartItems(updatedItems);
+                }
+            } catch (err) {
+                console.error('Failed to run cart items refresh operation:', err);
+            }
+        };
+
+        refreshCartPrices();
+    }, [cartItems.length]);
 
     useEffect(() => {
         localStorage.setItem('cart', JSON.stringify(cartItems));
@@ -82,17 +122,20 @@ export const CartProvider = ({ children }) => {
         const days = getDaysCount();
         let subTotal = 0;
         let securityHold = 0;
-        let preDiscountTax = 0;
+
+        // Find minimum tax rate among all items in user's cart
+        let minTaxRate = 8;
+        if (cartItems.length > 0) {
+            minTaxRate = Math.min(...cartItems.map(item => item.taxRate !== undefined ? item.taxRate : 8));
+        }
 
         cartItems.forEach(item => {
             const itemSub = item.dailyRate * days * item.quantity;
             subTotal += itemSub;
             securityHold += item.securityDeposit * item.quantity;
-            const ratesTax = item.taxRate !== undefined ? item.taxRate : 8;
-            preDiscountTax += (itemSub * ratesTax) / 100;
         });
 
-
+        const preDiscountTax = (subTotal * minTaxRate) / 100;
         const tax = Math.round(preDiscountTax * 100) / 100;
         const grandTotal = subTotal + tax + securityHold;
 
@@ -102,7 +145,8 @@ export const CartProvider = ({ children }) => {
             securityHold,
             tax,
             preDiscountTax: tax,
-            grandTotal
+            grandTotal,
+            appliedTaxRate: minTaxRate
         };
     })();
 

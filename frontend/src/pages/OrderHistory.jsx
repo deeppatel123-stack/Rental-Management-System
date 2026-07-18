@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { FileText, Calendar, ArrowUpRight, QrCode, Trash2, PackageCheck, CheckCircle2, XCircle, Store, MapPin } from 'lucide-react';
+import { FileText, Calendar, ArrowUpRight, QrCode, Trash2, PackageCheck, CheckCircle2, XCircle, Store, MapPin, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const OrderHistory = () => {
@@ -36,6 +36,27 @@ export const OrderHistory = () => {
     }, []);
 
     const [signatures, setSignatures] = useState({});
+    const [customerOtps, setCustomerOtps] = useState({});
+    const [submittingOtp, setSubmittingOtp] = useState({});
+
+    const handleVerifyCustomerOtp = async (orderId, pickupId, otpCode) => {
+        if (!otpCode || otpCode.trim().length < 4) {
+            showToast('Please enter the OTP code to verify', 'warning');
+            return;
+        }
+        setSubmittingOtp(prev => ({ ...prev, [orderId]: true }));
+        try {
+            const res = await api.post(`/pickups/${pickupId}/customer-verify`, { otp: otpCode });
+            if (res.data.success) {
+                showToast('Handoff verified successfully! Enjoy your rental items. Order is now Active.', 'success');
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Verification failed. Please try again.', 'error');
+        } finally {
+            setSubmittingOtp(prev => ({ ...prev, [orderId]: false }));
+        }
+    };
 
     const handleSignAndPay = async (orderId, signature) => {
         if (!signature || !signature.trim()) {
@@ -62,6 +83,18 @@ export const OrderHistory = () => {
             }
         } catch (err) {
             showToast(err.response?.data?.message || 'Error requesting returns.', 'error');
+        }
+    };
+
+    const handleConfirmDelivery = async (orderId) => {
+        try {
+            const res = await api.post(`/rentals/${orderId}/confirm-delivery`);
+            if (res.data.success) {
+                showToast('Delivery confirmed successfully! Status updated to Delivered.', 'success');
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Error confirming delivery.', 'error');
         }
     };
 
@@ -145,12 +178,12 @@ export const OrderHistory = () => {
                                         <p className="text-[11px] text-slate-450 flex items-center gap-1">
                                             <Calendar className="w-3.5 h-3.5" /> Booked: {new Date(order.startDate).toLocaleDateString()} - {new Date(order.endDate).toLocaleDateString()}
                                         </p>
-                                        {order.status === 'Confirmed' && order.pickupOtp && (
+                                        {['Confirmed', 'Ready for Pickup', 'Picked Up'].includes(order.status) && order.pickupOtp && (
                                             <span className="bg-teal-500/10 text-teal-600 dark:text-teal-450 font-extrabold px-2 py-0.5 rounded-lg border border-teal-500/20">
                                                 🔑 Pickup OTP: {order.pickupOtp}
                                             </span>
                                         )}
-                                        {order.status === 'Active' && order.returnOtp && (
+                                        {['Active', 'Delivered', 'Return Requested', 'Overdue'].includes(order.status) && order.returnOtp && (
                                             <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-405 font-extrabold px-2 py-0.5 rounded-lg border border-indigo-500/20">
                                                 🔑 Return OTP: {order.returnOtp}
                                             </span>
@@ -203,8 +236,43 @@ export const OrderHistory = () => {
                                 </div>
                             </div>
 
+                            {order.pickupId && order.pickupStatus !== 'Completed' && order.pickupStatus !== 'Cancelled' && (
+                                <div className="mt-4 p-4 border border-cyan-500/25 bg-cyan-700/5 dark:bg-cyan-500/5 rounded-2xl space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 bg-cyan-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                                            <ShieldCheck className="w-4.5 h-4.5 text-cyan-505 dark:text-cyan-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-black text-slate-800 dark:text-slate-205 uppercase">Delivery OTP</p>
+                                            <p className="text-[10px] text-slate-500">
+                                                {order.pickupOtp
+                                                    ? 'Your delivery executive has a code. Share the OTP below with them to confirm receipt.'
+                                                    : 'Waiting for executive to arrive and generate the delivery OTP...'}
+                                            </p>
+                                        </div>
+                                    </div>
 
-                            {/* ── STORE PICKUP: simple status card, no tracker ── */}
+                                    {order.pickupOtp ? (
+                                        <div className="space-y-3">
+                                            <p className="text-[10px] text-slate-400">Share this OTP with the delivery executive when they arrive to confirm your handoff.</p>
+                                            <div className="p-4 bg-emerald-500/8 border-2 border-emerald-500/25 rounded-2xl text-center space-y-1.5">
+                                                <p className="text-[9px] font-black uppercase text-emerald-500 flex items-center justify-center gap-1">
+                                                    <ShieldCheck className="w-3 h-3" /> Your Delivery OTP
+                                                </p>
+                                                <div className="text-3xl font-black font-mono tracking-[0.45em] text-emerald-400 py-1.5">
+                                                    {order.pickupOtp}
+                                                </div>
+                                                <p className="text-[9px] text-slate-400">Show this to your delivery executive. They will enter it to confirm delivery.</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-[10px] text-slate-450 italic">Waiting for delivery. The executive will generate an OTP once they are on the way.</p>
+                                    )}
+                                </div>
+                            )}
+
+
+                            {/* STORE PICKUP: simple status card, no tracker */}
                             {(!order.deliveryType || order.deliveryType === 'Store Pickup') ? (
                                 <div className="pt-4 space-y-3">
                                     {/* Pickup info banner */}
@@ -296,71 +364,103 @@ export const OrderHistory = () => {
                                     )}
                                 </div>
                             ) : (
-                                // ── DELIVERY: full 4-step tracker ──
-                                <>
-                                    <div className="relative flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
-                                        {/* Connecting line backer */}
-                                        <div className="absolute top-8 left-[12.5%] right-[12.5%] h-0.5 bg-slate-100 dark:bg-slate-800/60 hidden md:block z-0" />
+                                // DELIVERY: full 4-step tracker
+                                (() => {
+                                    const rawSteps = [
+                                        { label: 'Staff Confirmed', done: order.status !== 'Pending' },
+                                        { label: 'Agreement Signed', done: order.agreementSigned },
+                                        { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Overdue' || order.status === 'Return Requested' },
+                                        { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Returned' }
+                                    ];
+                                    const steps = rawSteps.map((step, idx) => ({
+                                        ...step,
+                                        done: step.done || rawSteps.slice(idx + 1).some(s => s.done)
+                                    }));
+                                    const doneCount = steps.filter(s => s.done).length;
+                                    const pct = doneCount <= 1 ? 0 : doneCount === 2 ? 33.3 : doneCount === 3 ? 66.6 : 100;
 
-                                        {/* Active progress line */}
-                                        {(() => {
-                                            const steps = [
-                                                { label: 'Agreement Signed', done: order.agreementSigned },
-                                                { label: 'Staff Confirmed', done: order.status !== 'Pending' },
-                                                { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Overdue' },
-                                                { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Delivered' }
-                                            ];
-                                            const doneCount = steps.filter(s => s.done).length;
-                                            const pct = doneCount <= 1 ? 0 : doneCount === 2 ? 33.3 : doneCount === 3 ? 66.6 : 100;
-                                            return (
+                                    return (
+                                        <>
+                                            <div className="relative flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
+                                                {/* Connecting line backer */}
+                                                <div className="absolute top-8 left-[12.5%] right-[12.5%] h-0.5 bg-slate-100 dark:bg-slate-800/60 hidden md:block z-0" />
+
+                                                {/* Active progress line */}
                                                 <div
                                                     className="absolute top-8 left-[12.5%] h-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500 hidden md:block z-0 transition-all duration-700"
                                                     style={{ width: `calc(${pct}% * 0.75)` }}
                                                 />
-                                            );
-                                        })()}
 
-                                        {[
-                                            { label: 'Agreement Signed', done: order.agreementSigned },
-                                            { label: 'Staff Confirmed', done: order.status !== 'Pending' },
-                                            { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Overdue' },
-                                            { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Delivered' }
-                                        ].map((step, idx) => (
-                                            <div key={idx} className="flex flex-col items-center gap-2.5 z-10 w-full md:w-1/4">
-                                                <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs transition-all duration-300 ${step.done
-                                                    ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 border-none text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] scale-110'
-                                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'
-                                                    }`}>
-                                                    {step.done ? '✓' : idx + 1}
-                                                </div>
-                                                <span className={`text-[10.5px] font-extrabold ${step.done ? 'text-emerald-555 dark:text-emerald-450' : 'text-slate-400 dark:text-slate-500'}`}>{step.label}</span>
+                                                {steps.map((step, idx) => (
+                                                    <div key={idx} className="flex flex-col items-center gap-2.5 z-10 w-full md:w-1/4">
+                                                        <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs transition-all duration-300 ${step.done
+                                                            ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 border-none text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] scale-110'
+                                                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'
+                                                            }`}>
+                                                            {step.done ? '✓' : idx + 1}
+                                                        </div>
+                                                        <span className={`text-[10.5px] font-extrabold ${step.done ? 'text-emerald-555 dark:text-emerald-450' : 'text-slate-400 dark:text-slate-500'}`}>{step.label}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
 
-                                    {/* Active order → Request Return Banner */}
-                                    {order.status === 'Active' && (
-                                        <div className="mt-2 rounded-2xl border border-brand-400/35 bg-brand-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center flex-shrink-0">
-                                                    <PackageCheck className="w-5 h-5 text-brand-500" />
+                                            {/* Out for delivery / Active → Confirm Receipt */}
+                                            {order.status === 'Active' && (
+                                                <div className="mt-2 rounded-2xl border border-blue-400/35 bg-blue-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center flex-shrink-0 animate-pulse">
+                                                            <Store className="w-5 h-5 text-blue-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-extrabold text-blue-700 dark:text-blue-300">🚚 Out for Delivery &amp; Active</p>
+                                                            <p className="text-[10.5px] text-slate-500">Your rental is dispatched! Let us know when you safely receive the items.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleConfirmDelivery(order._id)}
+                                                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all flex-shrink-0"
+                                                    >
+                                                        Confirm Delivery Received
+                                                    </button>
                                                 </div>
-                                                <div>
-                                                    <p className="text-xs font-extrabold text-brand-700 dark:text-brand-300">Rental Out for Delivery & active</p>
-                                                    <p className="text-[10.5px] text-slate-500">Enjoy your items! Click below when ready to schedule return pickup collection.</p>
+                                            )}
+
+                                            {/* Received / Delivered → Request Return */}
+                                            {order.status === 'Delivered' && (
+                                                <div className="mt-2 rounded-2xl border border-brand-400/35 bg-brand-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center flex-shrink-0">
+                                                            <PackageCheck className="w-5 h-5 text-brand-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-extrabold text-brand-700 dark:text-brand-300">📦 Delivery Confirmed — Active Rental</p>
+                                                            <p className="text-[10.5px] text-slate-500">Enjoy your items! Click below when ready to schedule return pickup collection.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleRequestReturn(order._id)}
+                                                        className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all flex-shrink-0"
+                                                    >
+                                                        <PackageCheck className="w-3.5 h-3.5" /> Request Return
+                                                    </button>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-2 flex-shrink-0">
-                                                <button
-                                                    onClick={() => handleRequestReturn(order._id)}
-                                                    className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all"
-                                                >
-                                                    <PackageCheck className="w-3.5 h-3.5" /> Request Return
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
+                                            )}
+
+                                            {/* Completed / Settled */}
+                                            {(order.status === 'Completed' || order.status === 'Returned') && (
+                                                <div className="mt-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/5 p-4 flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">✓ Rental Completed &amp; Settled</p>
+                                                        <p className="text-[10.5px] text-slate-400">Items received back at our warehouse. Thank you for renting with us!</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()
                             )}
                         </div>
                     ))}
@@ -402,7 +502,7 @@ export const OrderHistory = () => {
                 )}
             </AnimatePresence>
 
-            {/* ── Delete Confirmation Modal ── */}
+            {/* Delete Confirmation Modal */}
             <AnimatePresence>
                 {confirmDelete && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
