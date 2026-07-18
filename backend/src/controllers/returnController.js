@@ -490,14 +490,16 @@ export const confirmReturn = async (req, res, next) => {
                         }
                         // Create Repair Ticket
                         if (productDoc) {
+                            const ticketNum = `TKT-${Date.now().toString().slice(-7)}`;
                             await RepairTicket.create({
+                                ticketNumber: ticketNum,
                                 inventoryItem: physicalUnit._id,
-                                product: productDoc._id,
+                                rentalOrder: returnDoc.rentalOrder._id || returnDoc.rentalOrder,
                                 reportedBy: req.user.id,
-                                issueDescription: item.damageDescription || 'Returned damaged during inspection',
-                                estimatedCost: item.damageCost || 0,
-                                status: 'Reported',
-                                ownerId: returnDoc.ownerId
+                                description: item.damageDescription || 'Returned damaged during return inspection',
+                                costEstimate: item.damageCost || 0,
+                                status: 'Inspection',
+                                severity: item.damageCost > 5000 ? 'Critical' : item.damageCost > 1000 ? 'High' : 'Medium'
                             });
                         }
                     } else if (item.status === 'Lost') {

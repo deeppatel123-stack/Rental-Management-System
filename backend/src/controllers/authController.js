@@ -313,10 +313,15 @@ export const resendVerification = async (req, res, next) => {
     }
 };
 
-// Admin: list all components of rental partners + their product additions
+// Admin: list all rental partners (Super Admin sees all; Rental Partner sees only themselves)
 export const getEmployeeList = async (req, res, next) => {
     try {
-        const employees = await User.find({ role: 'Rental Partner' })
+        // Rental Partners can only see themselves (for self-assignment in logistics)
+        const query = req.user.role === 'Rental Partner'
+            ? { _id: req.user.id, role: 'Rental Partner' }
+            : { role: 'Rental Partner' };
+
+        const employees = await User.find(query)
             .select('name email phone isVerified createdAt')
             .sort({ createdAt: -1 });
 

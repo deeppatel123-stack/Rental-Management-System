@@ -56,9 +56,9 @@ const WorkflowStepper = ({ currentStatus }) => {
                     <React.Fragment key={idx}>
                         <div className="flex flex-col items-center gap-1.5 min-w-[72px]">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                                    : isActive ? 'bg-brand-500 border-brand-500 text-white animate-pulse shadow-lg shadow-brand-500/25'
-                                        : currentStatus === 'Cancelled' ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                                            : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400'
+                                : isActive ? 'bg-brand-500 border-brand-500 text-white animate-pulse shadow-lg shadow-brand-500/25'
+                                    : currentStatus === 'Cancelled' ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                                        : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400'
                                 }`}>
                                 {isCompleted ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                             </div>
@@ -308,7 +308,6 @@ export const PickupWorkflow = () => {
     };
 
     const cancelPickup = async () => {
-        if (!window.confirm('Are you sure you want to cancel this pickup?')) return;
         setActionLoading(true);
         try {
             const res = await api.patch(`/pickups/${selectedPickup._id}/status`, {
@@ -382,8 +381,8 @@ export const PickupWorkflow = () => {
                     return (
                         <button key={tab} onClick={() => setActiveTab(tab)}
                             className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === tab
-                                    ? 'bg-brand-500/10 text-brand-500 border border-brand-500/25'
-                                    : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                                ? 'bg-brand-500/10 text-brand-500 border border-brand-500/25'
+                                : 'text-slate-400 hover:text-slate-200 border border-transparent'
                                 }`}>
                             {tab}
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">{count}</span>
@@ -562,11 +561,11 @@ export const PickupWorkflow = () => {
 
             {/*  PICKUP DETAIL PANEL  */}
             {selectedPickup && (
-                <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="w-full max-w-4xl glass-panel rounded-3xl my-8 relative overflow-hidden">
+                <div className="fixed inset-0 z-40 bg-transparent flex items-start justify-center p-6 overflow-y-auto">
+                    <div className="w-full max-w-4xl bg-white dark:bg-[#0c1222] border border-slate-200 dark:border-slate-800/80 rounded-3xl my-8 relative overflow-hidden shadow-2xl">
 
                         {/* Header */}
-                        <div className="sticky top-0 z-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl p-6 border-b border-slate-200/50 dark:border-slate-800/50">
+                        <div className="sticky top-0 z-10 bg-white dark:bg-[#0c1222] backdrop-blur-xl p-6 border-b border-slate-200 dark:border-slate-800/60">
                             <button onClick={() => setSelectedPickup(null)}
                                 className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
                                 <X className="w-5 h-5" />
@@ -584,7 +583,7 @@ export const PickupWorkflow = () => {
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-6 bg-white dark:bg-[#0c1222]">
                             {/* Workflow Stepper */}
                             <WorkflowStepper currentStatus={selectedPickup.status} />
 
@@ -776,8 +775,8 @@ export const PickupWorkflow = () => {
                                                         </div>
                                                         <button type="button" onClick={() => scanSerialNumber(idx)}
                                                             className={`px-3.5 py-2.5 border text-[10px] font-bold rounded-xl flex items-center gap-1.5 transition-all ${item.isVerified
-                                                                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                                                    : 'bg-brand-500/10 border-brand-500/20 text-brand-400 hover:bg-brand-500/20'
+                                                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                                                : 'bg-brand-500/10 border-brand-500/20 text-brand-400 hover:bg-brand-500/20'
                                                                 }`}>
                                                             <Scan className="w-3.5 h-3.5" />
                                                             {item.isVerified ? 'Re-Scan' : 'Scan Barcode'}

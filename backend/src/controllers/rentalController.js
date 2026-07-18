@@ -8,6 +8,8 @@ import Pickup from '../models/Pickup.js';
 import Return from '../models/Return.js';
 import Setting from '../models/Setting.js';
 import User from '../models/User.js';
+import Contract from '../models/Contract.js';
+import { triggerEvent } from '../services/eventService.js';
 import { generateInvoicePDF } from '../services/pdfService.js';
 import { generateQRCode } from '../services/qrService.js';
 import { getIo } from '../services/cronService.js';
@@ -158,15 +160,15 @@ export const createRentalOrder = async (req, res, next) => {
             securityDepositTotal,
             totalAmount,
             status: 'Pending',
-            paymentStatus: 'Paid',
-            depositStatus: 'Held',
+            paymentStatus: 'Unpaid',
+            depositStatus: 'Not Collected',
             ownerId: orderOwnerId,
             ownerName: orderOwnerName,
             branchId: orderBranchId,
             warehouseId: orderWarehouseId,
             timeline: [{
                 status: 'Pending',
-                description: 'Order placed successfully — awaiting staff review.',
+                description: 'Order placed successfully — awaiting partner review and approval.',
                 updatedBy: customerId
             }]
         });
@@ -180,7 +182,7 @@ export const createRentalOrder = async (req, res, next) => {
             subTotal,
             taxAmount,
             totalAmount,
-            paymentStatus: 'Paid'
+            paymentStatus: 'Unpaid'
         });
 
 
@@ -197,8 +199,8 @@ export const createRentalOrder = async (req, res, next) => {
         await Deposit.create({
             rentalOrder: rentalOrder._id,
             customer: customerId,
-            amountHeld: securityDepositTotal,
-            status: 'Held',
+            amountHeld: 0,
+            status: 'Not Collected',
             depositTransactionId: txId,
             ownerId: orderOwnerId
         });
@@ -211,55 +213,26 @@ export const createRentalOrder = async (req, res, next) => {
             amount: totalAmount,
             paymentMethod: paymentMethod || 'Card',
             transactionId: txId,
-            status: 'Completed',
+            status: 'Unpaid',
             ownerId: orderOwnerId
         });
 
 
-        const pickupOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        const pickupChecklist = rentalOrder.items.map(it => ({
-            productName: it.name,
-            serialNumber: '',
-            isVerified: false
-        }));
-
-        await Pickup.create({
-            rentalOrder: rentalOrder._id,
-            customer: customerId,
-            productId: rentalOrder.items[0]?.product,
-            scheduledDate: start,
-            checklist: pickupChecklist,
-            otp: pickupOtp,
-            status: 'Pending',
+        // Create Contract in Draft status
+        const contractNum = `CON-${Math.floor(100000 + Math.random() * 900000)}`;
+        const product = rentalOrder.items && rentalOrder.items.length > 0 ? rentalOrder.items[0].product : null;
+        await Contract.create({
+            contractNumber: contractNum,
+            rentalOrderId: rentalOrder._id,
+            customerId: customerId,
             ownerId: orderOwnerId,
-            timeline: [{
-                status: 'Pending',
-                notes: 'Pickup request generated at checkout'
-            }]
-        });
-
-
-        const returnOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        const returnChecklist = rentalOrder.items.map(it => ({
-            productName: it.name,
-            serialNumber: '',
-            status: 'Returned',
-            conditionRating: 'Excellent'
-        }));
-
-        await Return.create({
-            rentalOrder: rentalOrder._id,
-            customer: customerId,
-            productId: rentalOrder.items[0]?.product,
-            scheduledDate: end,
-            checklist: returnChecklist,
-            otp: returnOtp,
-            status: 'Pending',
-            ownerId: orderOwnerId,
-            timeline: [{
-                status: 'Pending',
-                notes: 'Return item record initialized at checkout'
-            }]
+            product,
+            rentalPeriod: {
+                startDate: rentalOrder.startDate,
+                endDate: rentalOrder.endDate
+            },
+            securityDeposit: securityDepositTotal,
+            status: 'Draft'
         });
 
 
@@ -369,16 +342,11 @@ export const signAgreement = async (req, res, next) => {
         const order = await RentalOrder.findById(req.params.id);
         if (!order) return res.status(404).json({ success: false, message: 'Rental order not found' });
 
-        order.agreementSigned = true;
-        order.customerSignature = signature;
-        order.timeline.push({
-            status: order.status,
-            description: 'Rental agreement e-signed by customer',
-            updatedBy: req.user.id
-        });
+        await triggerEvent('ContractSigned', { orderId: order._id, userId: req.user.id, extraData: { signature } });
+        await triggerEvent('PaymentCompleted', { orderId: order._id, userId: req.user.id });
 
-        await order.save();
-        res.json({ success: true, message: 'Agreement e-signed successfully!', order });
+        const updated = await RentalOrder.findById(order._id);
+        res.json({ success: true, message: 'Agreement e-signed & payments completed successfully!', order: updated });
     } catch (error) {
         next(error);
     }
@@ -389,29 +357,10 @@ export const requestReturnAction = async (req, res, next) => {
         const order = await RentalOrder.findById(req.params.id);
         if (!order) return res.status(404).json({ success: false, message: 'Rental order not found' });
 
-        order.status = 'Return Requested';
-        order.timeline.push({
-            status: 'Return Requested',
-            description: 'Customer notification return request filed',
-            updatedBy: req.user.id
-        });
+        await triggerEvent('ReturnRequested', { orderId: order._id, userId: req.user.id });
 
-        await order.save();
-
-
-        const returnDoc = await Return.findOneAndUpdate(
-            { rentalOrder: order._id },
-            { status: 'Pending' }
-        );
-        if (returnDoc) {
-            returnDoc.timeline.push({
-                status: 'Pending',
-                notes: 'Return request filed by customer.'
-            });
-            await returnDoc.save();
-        }
-
-        res.json({ success: true, message: 'Return request submitted successfully!', order });
+        const updated = await RentalOrder.findById(order._id);
+        res.json({ success: true, message: 'Return request submitted successfully!', order: updated });
     } catch (error) {
         next(error);
     }
@@ -499,12 +448,12 @@ export const deleteRentalOrder = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
-        const ALLOWED = ['Pending', 'Confirmed', 'Active', 'Delivered', 'Overdue'];
+        const ALLOWED = ['Pending', 'Confirmed', 'Active', 'Delivered', 'Overdue', 'Cancelled'];
         if (!ALLOWED.includes(status)) {
             return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${ALLOWED.join(', ')}` });
         }
 
-        const order = await RentalOrder.findById(req.params.id).populate('customer', '_id name');
+        const order = await RentalOrder.findById(req.params.id);
         if (!order) return res.status(404).json({ success: false, message: 'Order not found.' });
 
         // Row-Level Security: Only the owner partner can modify this order.
@@ -512,37 +461,27 @@ export const updateOrderStatus = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized: You do not own this order' });
         }
 
-        order.status = status;
-        await order.save();
-
-        //Notify customer in real-time about their order status change
-        const io = getIo();
-        if (io && order.customer) {
-            const isPickup = (!order.deliveryType || order.deliveryType === 'Store Pickup');
-            const statusLabels = {
-                Confirmed: isPickup
-                    ? 'Your order is confirmed! Please pick up your items at the store. 🏪'
-                    : 'Your order has been confirmed by partner! 🎉',
-                Active: isPickup
-                    ? 'Your rental is now active — items picked up from store! 🏪'
-                    : 'Your rental is now active — items dispatched! 📦',
-                Delivered: isPickup
-                    ? 'Rental completed. Your items have been returned to the store. ✅'
-                    : 'Delivery processed. Your rental is now settled & closed. ✅',
-                Overdue: isPickup
-                    ? 'Your rental is overdue. Please return the items to the store immediately. ⚠️'
-                    : 'Your rental is overdue. Please return the items. ⚠️',
-                Pending: 'Your order is pending partner review.'
-            };
-            io.to(order.customer._id.toString()).emit('order_status_updated', {
-                orderId: order._id,
-                orderNumber: order.orderNumber,
-                newStatus: status,
-                message: statusLabels[status] || `Order status changed to ${status}`
-            });
+        if (status === 'Confirmed') {
+            await triggerEvent('RentalApproved', { orderId: order._id, userId: req.user.id });
+            if (order.customerSignature) {
+                await triggerEvent('ContractSigned', { orderId: order._id, userId: req.user.id, extraData: { signature: order.customerSignature } });
+                await triggerEvent('PaymentCompleted', { orderId: order._id, userId: req.user.id });
+            }
+        } else if (status === 'Active') {
+            await triggerEvent('PickupCompleted', { orderId: order._id, userId: req.user.id });
+        } else if (status === 'Delivered') {
+            await triggerEvent('ReturnCompleted', { orderId: order._id, userId: req.user.id, extraData: { inspectionData: { overallCondition: 'Excellent' } } });
+        } else if (status === 'Cancelled') {
+            await triggerEvent('OrderCancelled', { orderId: order._id, userId: req.user.id });
+        } else if (status === 'Return Requested') {
+            await triggerEvent('ReturnRequested', { orderId: order._id, userId: req.user.id });
+        } else {
+            order.status = status;
+            await order.save();
         }
 
-        res.json({ success: true, message: `Order status updated to ${status}.`, order });
+        const updated = await RentalOrder.findById(order._id);
+        res.json({ success: true, message: `Order status updated and dependent modules synchronized.`, order: updated });
     } catch (error) {
         next(error);
     }
