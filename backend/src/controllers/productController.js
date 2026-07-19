@@ -232,7 +232,6 @@ export const updateProduct = async (req, res, next) => {
         if (totalStock) {
             const diff = Number(totalStock) - product.stock.total;
             if (diff > 0) {
-
                 for (let i = 0; i < diff; i++) {
                     const serialNum = `${product.sku}-SN-${Math.floor(100000 + Math.random() * 900000)}`;
                     await Inventory.create({
@@ -245,11 +244,29 @@ export const updateProduct = async (req, res, next) => {
                         movementHistory: [{ action: 'Stock Adjustment', notes: 'Increased stock limit' }]
                     });
                 }
+            } else if (diff < 0) {
+                const countToRemove = Math.abs(diff);
+                const itemsToDelete = await Inventory.find({ product: product._id, status: 'Available' })
+                    .limit(countToRemove);
+                for (const item of itemsToDelete) {
+                    await item.deleteOne();
+                }
             }
-            product.stock.total = Number(totalStock);
+
+            const totalCount = await Inventory.countDocuments({ product: product._id });
+            product.stock.total = totalCount;
 
             const availCount = await Inventory.countDocuments({ product: product._id, status: 'Available' });
             product.stock.available = availCount;
+
+            const reservedCount = await Inventory.countDocuments({ product: product._id, status: 'Reserved' });
+            product.stock.reserved = reservedCount;
+
+            const rentedCount = await Inventory.countDocuments({ product: product._id, status: 'Rented' });
+            product.stock.rented = rentedCount;
+
+            const maintenanceCount = await Inventory.countDocuments({ product: product._id, status: 'Maintenance' });
+            product.stock.maintenance = maintenanceCount;
         }
 
         await product.save();

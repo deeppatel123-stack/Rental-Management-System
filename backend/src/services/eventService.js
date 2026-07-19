@@ -479,6 +479,7 @@ export const triggerEvent = async (eventName, payload) => {
                 }
 
                 // Generate Penalty Invoice if penalty fees exist
+                const penaltyTotal = (lateFeeCalculated || 0) + (repairCost || 0);
                 if (penaltyTotal > 0) {
                     const hex = Math.floor(1000 + Date.now() % 9000);
                     await Invoice.create({
