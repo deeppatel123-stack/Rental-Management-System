@@ -4,6 +4,7 @@ import Inventory from '../models/Inventory.js';
 import { generateQRCode } from '../services/qrService.js';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import Wishlist from '../models/Wishlist.js';
 
 export const getProducts = async (req, res, next) => {
     try {
@@ -77,7 +78,7 @@ export const getProductById = async (req, res, next) => {
 
 export const createProduct = async (req, res, next) => {
     try {
-        const { name, sku, category, brand, manufacturer, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, depositType, depositValue, taxRate, totalStock, specifications, accessories, variants } = req.body;
+        const { name, sku, category, brand, manufacturer, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, depositAmount, penaltyAmount, depositType, depositValue, taxRate, totalStock, specifications, accessories, variants } = req.body;
 
         const productExists = await Product.findOne({ sku });
         if (productExists) {
@@ -130,7 +131,9 @@ export const createProduct = async (req, res, next) => {
             description,
             images,
             priceRate,
-            securityDeposit,
+            securityDeposit: Number(depositAmount || securityDeposit || 0),
+            depositAmount: Number(depositAmount || securityDeposit || 0),
+            penaltyAmount: Number(penaltyAmount || 0),
             depositType,
             depositValue,
             taxRate: taxRate !== undefined ? Number(taxRate) : 8,
@@ -188,13 +191,20 @@ export const updateProduct = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Unauthorized: You do not own this product' });
         }
 
-        const { name, category, brand, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, totalStock, taxRate } = req.body;
+        const { name, category, brand, description, hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, securityDeposit, depositAmount, penaltyAmount, totalStock, taxRate } = req.body;
 
         if (name) product.name = name;
         if (category) product.category = category;
         if (brand) product.brand = brand;
         if (description) product.description = description;
-        if (securityDeposit) product.securityDeposit = securityDeposit;
+        if (depositAmount !== undefined) {
+            product.depositAmount = Number(depositAmount);
+            product.securityDeposit = Number(depositAmount);
+        } else if (securityDeposit !== undefined) {
+            product.depositAmount = Number(securityDeposit);
+            product.securityDeposit = Number(securityDeposit);
+        }
+        if (penaltyAmount !== undefined) product.penaltyAmount = Number(penaltyAmount);
         if (taxRate !== undefined) product.taxRate = Number(taxRate);
 
         const rateDaily = dailyPrice || req.body.priceRate?.daily;
@@ -291,6 +301,57 @@ export const getReviews = async (req, res, next) => {
     try {
         const reviews = await Review.find({ product: req.params.id }).populate('customer', 'name');
         res.json({ success: true, reviews });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getWishlist = async (req, res, next) => {
+    try {
+        let wishlist = await Wishlist.findOne({ customer: req.user.id })
+            .populate({
+                path: 'products',
+                select: 'name priceRate securityDeposit images brand category stock description'
+            });
+
+        if (!wishlist) {
+            wishlist = await Wishlist.create({ customer: req.user.id, products: [] });
+        }
+
+        res.json({ success: true, products: wishlist.products });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const toggleWishlist = async (req, res, next) => {
+    try {
+        const { productId } = req.body;
+        if (!productId) {
+            return res.status(400).json({ success: false, message: 'Product ID is required.' });
+        }
+
+        let wishlist = await Wishlist.findOne({ customer: req.user.id });
+        if (!wishlist) {
+            wishlist = await Wishlist.create({ customer: req.user.id, products: [] });
+        }
+
+        const index = wishlist.products.indexOf(productId);
+        let added = false;
+        if (index > -1) {
+            wishlist.products.splice(index, 1);
+        } else {
+            wishlist.products.push(productId);
+            added = true;
+        }
+
+        await wishlist.save();
+
+        res.json({
+            success: true,
+            message: added ? 'Product added to wishlist.' : 'Product removed from wishlist.',
+            added
+        });
     } catch (error) {
         next(error);
     }

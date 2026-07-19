@@ -36,6 +36,8 @@ const ProductSchema = new mongoose.Schema({
     securityDeposit: { type: Number, required: true, default: 0 },
     depositType: { type: String, enum: ['Fixed', 'Percentage'], default: 'Fixed' },
     depositValue: { type: Number, default: 0 },
+    depositAmount: { type: Number, default: 0 },
+    penaltyAmount: { type: Number, default: 0 },
     taxRate: { type: Number, default: 8 },
 
 

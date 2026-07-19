@@ -65,6 +65,21 @@ export const RentalManagement = () => {
         }
     };
 
+    const handleMakeOverdue = async (orderId) => {
+        setUpdatingId(orderId);
+        try {
+            const res = await api.post(`/rentals/${orderId}/make-overdue`);
+            if (res.data.success) {
+                showToast(`⚡ Order shifted to overdue (simulated 2 days late)!`, 'success');
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Failed to simulate overdue.', 'error');
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
     // 'Pending' tab catches legacy 'Quotation' orders too
     // 'Delivered' tab catches legacy 'Returned' orders too
     const filtered = filter === 'All'
@@ -93,7 +108,7 @@ export const RentalManagement = () => {
             </div>
 
             <div className="flex gap-2">
-                {['All', 'Pending', 'Confirmed', 'Active', 'Delivered', 'Overdue'].map(tab => (
+                {['All', 'Pending', 'Confirmed', 'Active', 'Delivered'].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setFilter(tab)}
@@ -136,7 +151,14 @@ export const RentalManagement = () => {
                                             className="px-5 py-4 min-w-[200px] max-w-[320px] cursor-pointer group"
                                         >
                                             <span className="text-[10px] text-slate-400 font-mono block font-extrabold uppercase whitespace-nowrap group-hover:text-brand-500 transition-colors">
-                                                ID: {order.orderNumber} <span className="text-[9px] font-bold text-brand-500 ml-1.5 opacity-80 group-hover:opacity-100">🗺️ View Map Detail</span>
+                                                ID: {order.orderNumber}
+                                                <span className={`ml-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${order.deliveryType === 'Delivery'
+                                                    ? 'bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400'
+                                                    : 'bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                    }`}>
+                                                    {order.deliveryType || 'Store Pickup'}
+                                                </span>
+                                                <span className="text-[9px] font-bold text-brand-500 ml-1.5 opacity-80 group-hover:opacity-100">🗺️ View Map Detail</span>
                                             </span>
                                             <div className="font-bold text-slate-900 dark:text-white break-words mt-0.5">
                                                 {(() => {
@@ -173,11 +195,10 @@ export const RentalManagement = () => {
                                                                     : 'bg-brand-500/15 border-brand-500 text-brand-500'}
                                                     ${updatingId === order._id ? 'opacity-50 cursor-wait' : 'hover:opacity-80'}`}
                                             >
-                                                {/* Always include current status so React select shows correct value */}
                                                 {[
                                                     ...new Set([
                                                         order.status,
-                                                        'Pending', 'Confirmed', 'Active', 'Delivered', 'Overdue'
+                                                        'Pending', 'Confirmed', 'Active', 'Delivered'
                                                     ])
                                                 ].map(s => (
                                                     <option key={s} value={s}>
@@ -190,7 +211,7 @@ export const RentalManagement = () => {
                                             ${(order.totalAmount || 0).toFixed(2)}
                                         </td>
                                         <td className="px-5 py-4 italic font-serif text-slate-500 text-xs whitespace-nowrap">
-                                            {order.agreementSigned ? (order.customerSignature || 'E-Signed') : 'Unsigned'}
+                                            {order.customerSignature || (order.customer ? order.customer.name : 'E-Signed')}
                                         </td>
                                         <td className="px-5 py-4 text-right whitespace-nowrap">
                                             {(order.status === 'Pending' || order.status === 'Quotation') ? (
@@ -204,6 +225,8 @@ export const RentalManagement = () => {
                                                 <span className="text-[10px] text-brand-600 dark:text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-lg border border-brand-500/20">Approved &amp; Ready</span>
                                             ) : (order.status === 'Delivered' || order.status === 'Returned') ? (
                                                 <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">✓ Delivered</span>
+                                            ) : order.status === 'Active' ? (
+                                                <span className="text-[10px] text-teal-600 font-bold bg-teal-500/10 px-2 py-0.5 rounded-lg border border-teal-555/20">Active</span>
                                             ) : (
                                                 <span className="text-[10px] text-slate-400 font-semibold font-mono capitalize">{order.status.toLowerCase()}</span>
                                             )}

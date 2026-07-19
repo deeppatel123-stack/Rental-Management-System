@@ -12,6 +12,8 @@ const PaymentSchema = new mongoose.Schema({
     status: { type: String, enum: ['Pending', 'Unpaid', 'Completed', 'Refunded', 'Failed'], default: 'Pending' },
 
     gatewayResponse: mongoose.Schema.Types.Mixed,
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    purpose: { type: String, enum: ['Rental Payment', 'Security Deposit', 'Late Return Penalty'], default: 'Rental Payment' },
     createdAt: { type: Date, default: Date.now }
 }, {
     timestamps: true

@@ -39,6 +39,8 @@ import CustomerList from './pages/CustomerList';
 import EnterpriseSuite from './pages/EnterpriseSuite';
 import { AddProductPage } from './pages/AddProductPage';
 import { ManageExecutives } from './pages/ManageExecutives';
+import LateReturns from './pages/LateReturns';
+import DepositLedger from './pages/DepositLedger';
 
 
 import { Bell, X } from 'lucide-react';
@@ -168,6 +170,12 @@ const AppContent = () => {
             <Route path="/partner/executives" element={
               <ProtectedRoute allowedRoles={['Rental Partner']}><ManageExecutives /></ProtectedRoute>
             } />
+            <Route path="/partner/late-returns" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><LateReturns /></ProtectedRoute>
+            } />
+            <Route path="/partner/deposit-ledger" element={
+              <ProtectedRoute allowedRoles={['Rental Partner']}><DepositLedger /></ProtectedRoute>
+            } />
 
             <Route path="/admin" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><AdminDashboard /></ProtectedRoute>
@@ -192,6 +200,12 @@ const AppContent = () => {
             } />
             <Route path="/admin/enterprise" element={
               <ProtectedRoute allowedRoles={['Super Admin']}><EnterpriseSuite /></ProtectedRoute>
+            } />
+            <Route path="/admin/late-returns" element={
+              <ProtectedRoute allowedRoles={['Super Admin']}><LateReturns /></ProtectedRoute>
+            } />
+            <Route path="/admin/deposit-ledger" element={
+              <ProtectedRoute allowedRoles={['Super Admin']}><DepositLedger /></ProtectedRoute>
             } />
 
 

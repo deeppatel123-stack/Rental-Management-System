@@ -1,19 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
-import { ArrowLeft, CheckCircle, PackageOpen, Award, Info, Star } from 'lucide-react';
+import { ArrowLeft, CheckCircle, PackageOpen, Award, Info, Star, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProductDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const { addToCart } = useCart();
     const { showToast } = useToast();
 
     const [product, setProduct] = useState(null);
     const [reviews, setReviews] = useState([]);
+    const [isWishlisted, setIsWishlisted] = useState(false);
+
+    useEffect(() => {
+        const checkWishlist = async () => {
+            if (!user || user.role !== 'Customer') return;
+            try {
+                const res = await api.get('/products/wishlist');
+                if (res.data.success) {
+                    const match = res.data.products.some(p => p._id === id);
+                    setIsWishlisted(match);
+                }
+            } catch (err) {
+                console.warn('Failed to load wishlist status:', err);
+            }
+        };
+        checkWishlist();
+    }, [id, user]);
+
+    const handleToggleWishlist = async () => {
+        if (!user) {
+            showToast('Please login to save items to wishlist.', 'warning');
+            return;
+        }
+        if (user.role !== 'Customer') {
+            showToast('Only customers can wishlist items.', 'warning');
+            return;
+        }
+        try {
+            const res = await api.post('/products/wishlist/toggle', { productId: id });
+            if (res.data.success) {
+                setIsWishlisted(res.data.added);
+                if (res.data.added) {
+                    showToast('Item saved to wishlist!', 'success');
+                } else {
+                    showToast('Removed from wishlist.', 'success');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to toggle wishlist:', err);
+            showToast('Failed to update wishlist.', 'error');
+        }
+    };
     const [loading, setLoading] = useState(true);
 
 
@@ -143,19 +186,32 @@ export const ProductDetails = () => {
                         {product.description || 'Professional rental hardware suited for commercial operations.'}
                     </p>
 
-                    <button
-                        onClick={() => {
-                            const res = addToCart(product);
-                            if (res && res.success === false) {
-                                showToast(res.message, 'warning');
-                            } else {
-                                navigate('/cart');
-                            }
-                        }}
-                        className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-2xl shadow-lg transition-transform hover:-translate-y-0.5 text-xs uppercase"
-                    >
-                        Add to Rental Cart & Setup Dates
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => {
+                                const res = addToCart(product);
+                                if (res && res.success === false) {
+                                    showToast(res.message, 'warning');
+                                } else {
+                                    navigate('/cart');
+                                }
+                            }}
+                            className="flex-1 py-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-2xl shadow-lg transition-transform hover:-translate-y-0.5 text-xs uppercase"
+                        >
+                            Add to Rental Cart & Setup Dates
+                        </button>
+                        {(!user || user.role === 'Customer') && (
+                            <button
+                                onClick={handleToggleWishlist}
+                                className={`px-5 rounded-2xl border transition-all flex items-center justify-center ${isWishlisted
+                                    ? 'border-rose-500 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20'
+                                    : 'border-slate-205 dark:border-slate-800 hover:scale-105 active:scale-95 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-500'}`}
+                                title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
+                            >
+                                <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 

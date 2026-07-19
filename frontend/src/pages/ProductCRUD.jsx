@@ -29,6 +29,8 @@ export const ProductCRUD = () => {
     const [daily, setDaily] = useState('');
     const [weekly, setWeekly] = useState('');
     const [deposit, setDeposit] = useState('');
+    const [depositAmount, setDepositAmount] = useState('');
+    const [penaltyAmount, setPenaltyAmount] = useState('');
     const [description, setDescription] = useState('');
     const [specStr, setSpecStr] = useState('');
     const [totalStock, setTotalStock] = useState(1);
@@ -71,6 +73,8 @@ export const ProductCRUD = () => {
         setDaily('');
         setWeekly('');
         setDeposit('');
+        setDepositAmount('');
+        setPenaltyAmount('');
         setDescription('');
         setSpecStr('');
         setTotalStock(1);
@@ -88,6 +92,8 @@ export const ProductCRUD = () => {
         setDaily(prod.priceRate.daily);
         setWeekly(prod.priceRate.weekly || 250);
         setDeposit(prod.securityDeposit);
+        setDepositAmount(prod.depositAmount !== undefined ? prod.depositAmount : prod.securityDeposit);
+        setPenaltyAmount(prod.penaltyAmount !== undefined ? prod.penaltyAmount : 0);
         setTaxRate(prod.taxRate !== undefined ? prod.taxRate : 8);
         setDescription(prod.description);
         setTotalStock(prod.stock?.total || 1);
@@ -116,7 +122,9 @@ export const ProductCRUD = () => {
         formData.append('brand', brand);
         formData.append('dailyPrice', daily);
         formData.append('weeklyPrice', weekly);
-        formData.append('securityDeposit', deposit);
+        formData.append('securityDeposit', depositAmount || deposit);
+        formData.append('depositAmount', depositAmount || deposit);
+        formData.append('penaltyAmount', penaltyAmount || 0);
         formData.append('taxRate', taxRate);
         formData.append('description', description);
         formData.append('totalStock', totalStock);
@@ -345,20 +353,36 @@ export const ProductCRUD = () => {
                                         />
                                     </div>
                                     <div className="flex flex-col justify-between h-full space-y-1">
-                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Escrow Hold ($) *</label>
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Deposit Amount ($) *</label>
                                         <input
                                             type="number"
                                             step="0.01"
-                                            value={deposit}
-                                            onChange={(e) => setDeposit(e.target.value)}
+                                            value={depositAmount}
+                                            onChange={(e) => {
+                                                setDepositAmount(e.target.value);
+                                                setDeposit(e.target.value);
+                                            }}
                                             placeholder="0.00"
-                                            className="w-full glass-input text-xs font-bold text-emerald-600 dark:text-emerald-405"
+                                            className="w-full glass-input text-xs font-bold text-emerald-600 dark:text-emerald-400"
                                             required
                                             min={0}
                                         />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="flex flex-col justify-between h-full space-y-1">
+                                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Late Return Penalty ($/day) *</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={penaltyAmount}
+                                            onChange={(e) => setPenaltyAmount(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full glass-input text-xs font-bold text-rose-500 dark:text-rose-455"
+                                            required
+                                            min={0}
+                                        />
+                                    </div>
                                     <div className="flex flex-col justify-between h-full space-y-1">
                                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Tax Rate (%) *</label>
                                         <input

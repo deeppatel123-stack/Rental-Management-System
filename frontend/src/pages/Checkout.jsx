@@ -83,6 +83,7 @@ export const Checkout = () => {
                 shippingAddress,
                 paymentMethod,
                 deliveryFee,
+                signature,
                 couponCode: appliedCoupon ? appliedCoupon.code : undefined
             });
 

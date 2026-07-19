@@ -18,6 +18,7 @@ export const AddProductPage = () => {
     const [daily, setDaily] = useState('');
     const [weekly, setWeekly] = useState('');
     const [deposit, setDeposit] = useState('');
+    const [penaltyAmount, setPenaltyAmount] = useState('');
     const [description, setDescription] = useState('');
     const [specStr, setSpecStr] = useState('Resolution: 4K, Color: Graphite, Weight: 1.2kg');
     const [totalStock, setTotalStock] = useState(1);
@@ -61,6 +62,8 @@ export const AddProductPage = () => {
         formData.append('dailyPrice', daily);
         formData.append('weeklyPrice', weekly);
         formData.append('securityDeposit', deposit);
+        formData.append('depositAmount', deposit);
+        formData.append('penaltyAmount', penaltyAmount || 0);
         formData.append('taxRate', taxRate);
         formData.append('description', description);
         formData.append('totalStock', totalStock);
@@ -220,7 +223,7 @@ export const AddProductPage = () => {
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="space-y-1">
                                     <span className="text-[10px] text-slate-450 font-bold block">Sales Tax Rate (%) *</span>
                                     <input
@@ -245,6 +248,19 @@ export const AddProductPage = () => {
                                         onChange={e => setTotalStock(e.target.value)}
                                         className="w-full glass-input font-bold"
                                         placeholder="1"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-[10px] text-slate-450 font-bold block text-rose-500">Late Return Penalty ($/day) *</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        required
+                                        min="0"
+                                        value={penaltyAmount}
+                                        onChange={e => setPenaltyAmount(e.target.value)}
+                                        className="w-full glass-input font-bold text-rose-500"
+                                        placeholder="0.00"
                                     />
                                 </div>
                             </div>

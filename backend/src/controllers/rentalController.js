@@ -72,7 +72,7 @@ export const createQuotation = async (req, res, next) => {
 
 export const createRentalOrder = async (req, res, next) => {
     try {
-        const { items, startDate, endDate, deliveryType, shippingAddress, paymentMethod, couponCode, deliveryFee } = req.body;
+        const { items, startDate, endDate, deliveryType, shippingAddress, paymentMethod, couponCode, deliveryFee, signature } = req.body;
         const customerId = req.user.id;
 
         const start = new Date(startDate);
@@ -185,7 +185,7 @@ export const createRentalOrder = async (req, res, next) => {
         const taxAmount = subTotal > 0
             ? Math.round(((discountedSubtotal / subTotal) * totalPreDiscountTax) * 100) / 100
             : 0;
-        const totalAmount = discountedSubtotal + taxAmount + securityDepositTotal + (Number(deliveryFee) || 0);
+        const totalAmount = discountedSubtotal + taxAmount + (Number(deliveryFee) || 0);
 
         const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
         const rentalOrder = await RentalOrder.create({
@@ -203,7 +203,9 @@ export const createRentalOrder = async (req, res, next) => {
             deliveryFee: Number(deliveryFee) || 0,
             totalAmount,
             status: 'Pending',
-            paymentStatus: 'Unpaid',
+            paymentStatus: 'Paid',
+            agreementSigned: true,
+            customerSignature: signature || 'Authorized at Checkout',
             depositStatus: 'Not Collected',
             ownerId: orderOwnerId,
             ownerName: orderOwnerName,
@@ -226,7 +228,7 @@ export const createRentalOrder = async (req, res, next) => {
             taxAmount,
             discountAmount,
             totalAmount,
-            paymentStatus: 'Unpaid'
+            paymentStatus: 'Paid'
         });
 
 
@@ -257,7 +259,7 @@ export const createRentalOrder = async (req, res, next) => {
             amount: totalAmount,
             paymentMethod: paymentMethod || 'Card',
             transactionId: txId,
-            status: 'Unpaid',
+            status: 'Completed',
             ownerId: orderOwnerId
         });
 
@@ -400,6 +402,28 @@ export const signAgreement = async (req, res, next) => {
     }
 };
 
+export const paySecurityDeposit = async (req, res, next) => {
+    try {
+        const order = await RentalOrder.findById(req.params.id);
+        if (!order) return res.status(404).json({ success: false, message: 'Rental order not found' });
+
+        if (order.paymentStatus !== 'Paid') {
+            return res.status(400).json({ success: false, message: 'Rental fees must be paid first before paying the deposit.' });
+        }
+
+        if (order.depositStatus === 'Held') {
+            return res.status(400).json({ success: false, message: 'Deposit has already been paid and is held.' });
+        }
+
+        await triggerEvent('DepositHeld', { orderId: order._id, userId: req.user.id });
+
+        const updated = await RentalOrder.findById(order._id);
+        res.json({ success: true, message: 'Security deposit paid and held successfully!', order: updated });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const requestReturnAction = async (req, res, next) => {
     try {
         const order = await RentalOrder.findById(req.params.id);
@@ -529,6 +553,250 @@ export const updateOrderStatus = async (req, res, next) => {
 
         const updated = await RentalOrder.findById(order._id);
         res.json({ success: true, message: `Order status updated and dependent modules synchronized.`, order: updated });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// DEV ONLY: Shortcut to make order overdue instantly
+export const makeRentalOverdue = async (req, res, next) => {
+    try {
+        const order = await RentalOrder.findById(req.params.id).populate('customer');
+        if (!order) return res.status(404).json({ success: false, message: 'Order not found.' });
+
+        // Set status to Delivered (active state in client possession)
+        order.status = 'Delivered';
+        // Set endDate to 2 days ago
+        order.endDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+        let settings = await Setting.findOne() || {};
+
+        // Calculate penalty instantly
+        const diffMs = Date.now() - order.endDate;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+        const dailyRateTotal = order.items.reduce((acc, it) => acc + (it.rateApplied || 0), 0);
+        const hourlyRateTotal = dailyRateTotal / 24;
+
+        let lateFee = 0;
+        if (settings.lateFeeChargeType === 'hourly') {
+            lateFee = Math.max(1, diffHours) * hourlyRateTotal * (settings.lateFeeMultiplier || 1.5);
+        } else {
+            const diffDays = Math.max(1, Math.ceil(diffHours / 24));
+            lateFee = diffDays * dailyRateTotal * (settings.lateFeeMultiplier || 1.5);
+        }
+
+        if (settings.maxLateFeeLimit && lateFee > settings.maxLateFeeLimit) {
+            lateFee = settings.maxLateFeeLimit;
+        }
+        lateFee = Math.round(lateFee * 100) / 100;
+
+        order.lateFees = lateFee;
+        order.totalAmount = order.subTotal + order.taxAmount + order.securityDepositTotal - order.discountAmount + lateFee;
+        await order.save();
+
+        // Create penalty invoice
+        let penaltyInvoice = await Invoice.findOne({
+            rentalOrder: order._id,
+            invoiceType: 'Overdue Penalty'
+        });
+
+        if (!penaltyInvoice) {
+            const hex = Math.floor(100000 + Math.random() * 900000);
+            penaltyInvoice = await Invoice.create({
+                invoiceNumber: `INV-PEN-${hex}`,
+                rentalOrder: order._id,
+                customer: order.customer._id,
+                invoiceType: 'Overdue Penalty',
+                subTotal: lateFee,
+                taxAmount: 0,
+                lateFees: lateFee,
+                totalAmount: lateFee,
+                paymentStatus: 'Unpaid'
+            });
+        } else {
+            penaltyInvoice.subTotal = lateFee;
+            penaltyInvoice.lateFees = lateFee;
+            penaltyInvoice.totalAmount = lateFee;
+            await penaltyInvoice.save();
+        }
+
+        res.json({
+            success: true,
+            message: `Developer shortcut executed successfully: Order #${order.orderNumber} shifted to overdue. Daily rate: $${dailyRateTotal}. Late fee calculated: $${lateFee}.`,
+            order
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const payLateReturnPenalty = async (req, res, next) => {
+    try {
+        const order = await RentalOrder.findById(req.params.id);
+        if (!order) return res.status(404).json({ success: false, message: 'Rental order not found' });
+
+        const now = new Date();
+        if (now <= order.endDate) {
+            return res.status(400).json({ success: false, message: 'Rental period has not expired yet. No late penalty accumulated.' });
+        }
+
+        const diffMs = now - order.endDate;
+        const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+        let orderDailyPenalty = 0;
+        for (const it of order.items) {
+            const prodObj = await Product.findById(it.product);
+            if (prodObj) {
+                orderDailyPenalty += (prodObj.penaltyAmount || 0) * (it.quantity || 1);
+            }
+        }
+
+        if (orderDailyPenalty === 0) {
+            const dailyRateTotal = order.items.reduce((acc, it) => acc + (it.rateApplied || 0), 0);
+            orderDailyPenalty = dailyRateTotal * 1.5;
+        }
+
+        const accumulatedPenalty = Math.round(diffDays * orderDailyPenalty * 100) / 100;
+
+        if (accumulatedPenalty <= 0) {
+            return res.status(400).json({ success: false, message: 'No late penalty calculated.' });
+        }
+
+        // Check if already paid
+        const existing = await Payment.findOne({
+            rentalOrder: order._id,
+            purpose: 'Late Return Penalty',
+            status: 'Completed'
+        });
+        if (existing) {
+            return res.status(400).json({ success: false, message: 'Late penalty has already been paid.' });
+        }
+
+        // Process payment
+        await Payment.create({
+            rentalOrder: order._id,
+            customer: order.customer,
+            amount: accumulatedPenalty,
+            paymentMethod: 'Card',
+            transactionId: `PEN-${Math.floor(10000000 + Math.random() * 90000000)}`,
+            status: 'Completed',
+            ownerId: order.ownerId,
+            purpose: 'Late Return Penalty'
+        });
+
+        order.lateFees = accumulatedPenalty;
+        order.timeline.push({
+            status: 'Penalty Paid',
+            description: `Late return penalty of $${accumulatedPenalty.toFixed(2)} paid successfully by card.`,
+            updatedBy: req.user.id
+        });
+        await order.save();
+
+        res.json({
+            success: true,
+            message: `Late return penalty of $${accumulatedPenalty.toFixed(2)} paid successfully!`,
+            order
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getLateReturns = async (req, res, next) => {
+    try {
+        const now = new Date();
+        const query = {
+            endDate: { $lt: now },
+            status: { $in: ['Active', 'Picked Up', 'Overdue', 'Return Requested'] }
+        };
+
+        if (req.user.role === 'Rental Partner') {
+            query.ownerId = req.user.id;
+        }
+
+        const orders = await RentalOrder.find(query)
+            .populate('customer', 'name email phone')
+            .populate('items.product', 'name sku penaltyAmount depositAmount images');
+
+        const lateReturns = orders.map(order => {
+            const diffMs = now - order.endDate;
+            const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+            let dailyPenaltyRate = 0;
+            order.items.forEach(it => {
+                const prod = it.product;
+                if (prod) {
+                    dailyPenaltyRate += (prod.penaltyAmount || 0) * (it.quantity || 1);
+                }
+            });
+
+            if (dailyPenaltyRate === 0) {
+                const dailyRateTotal = order.items.reduce((acc, it) => acc + (it.rateApplied || 0), 0);
+                dailyPenaltyRate = dailyRateTotal * 1.5;
+            }
+
+            const accumulatedPenalty = Math.round(dailyPenaltyRate * diffDays * 100) / 100;
+
+            return {
+                _id: order._id,
+                orderNumber: order.orderNumber,
+                customerName: order.customer?.name || 'Customer',
+                customerPhone: order.customer?.phone || '',
+                endDate: order.endDate,
+                status: order.status,
+                daysLate: diffDays,
+                dailyPenaltyRate,
+                accumulatedPenalty,
+                depositAmount: order.securityDepositTotal,
+                depositStatus: order.depositStatus,
+                items: order.items.map(it => ({
+                    name: it.name,
+                    quantity: it.quantity,
+                    penaltyAmount: it.product?.penaltyAmount || 0
+                }))
+            };
+        });
+
+        res.json({ success: true, count: lateReturns.length, lateReturns });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getDepositLedger = async (req, res, next) => {
+    try {
+        const query = {
+            purpose: { $in: ['Security Deposit', 'Late Return Penalty'] },
+            status: 'Completed'
+        };
+
+        if (req.user.role === 'Rental Partner') {
+            // Find products owned by this partner
+            const partnerProducts = await Product.find({ ownerId: req.user.id }).distinct('_id');
+            // Find orders containing these products, or explicitly owned by this partner
+            const partnerOrders = await RentalOrder.find({
+                $or: [
+                    { ownerId: req.user.id },
+                    { 'items.product': { $in: partnerProducts } }
+                ]
+            }).distinct('_id');
+
+            query.$or = [
+                { ownerId: req.user.id },
+                { rentalOrder: { $in: partnerOrders } }
+            ];
+        }
+
+        const payments = await Payment.find(query)
+            .populate('customer', 'name email phone')
+            .populate({
+                path: 'rentalOrder',
+                select: 'orderNumber startDate endDate depositStatus status'
+            })
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, count: payments.length, ledger: payments });
     } catch (error) {
         next(error);
     }

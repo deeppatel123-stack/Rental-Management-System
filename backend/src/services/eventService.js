@@ -179,16 +179,74 @@ export const triggerEvent = async (eventName, payload) => {
             }
 
             case 'PaymentCompleted': {
-                // If payment is successful
+                // If payment is successful (this is the rental fee booking payment)
                 order.paymentStatus = 'Paid';
-                order.depositStatus = 'Held';
-                order.status = 'Ready for Pickup';
+                // depositStatus remains 'Not Collected' until paid separately
                 order.timeline.push({
-                    status: 'Ready for Pickup',
-                    description: 'Rental fee payment confirmed and security deposit holds activated. Order is ready for pickup!',
+                    status: 'Paid',
+                    description: 'Rental booking fee payment confirmed. Security deposit hold payment is now pending to unlock pickup OTP.',
                     updatedBy: userId
                 });
                 await order.save();
+
+                // Notify Customer
+                await sendNotification(
+                    order.customer._id,
+                    'Rental Fee Paid Successfully',
+                    `Payment of $${order.totalAmount} received for order #${order.orderNumber}! Please pay the security deposit of $${order.securityDepositTotal} to unlock your pickup OTP.`,
+                    'Rental',
+                    order._id
+                );
+
+                if (io) {
+                    io.emit('order_refreshed', { orderId: order._id });
+                }
+                break;
+            }
+
+            case 'DepositHeld': {
+                // If deposit hold payment is successful
+                order.depositStatus = 'Held';
+                order.status = 'Ready for Pickup';
+
+                // Update Deposit record in DB to show actual deposit held
+                const depositObj = await Deposit.findOne({ rentalOrder: order._id });
+                if (depositObj) {
+                    depositObj.amountHeld = order.securityDepositTotal;
+                    depositObj.status = 'Held';
+                    await depositObj.save();
+                }
+
+                // Add timeline entry
+                order.timeline.push({
+                    status: 'Ready for Pickup',
+                    description: `Security deposit of $${order.securityDepositTotal} received & held. Order is ready for pickup!`,
+                    updatedBy: userId
+                });
+                await order.save();
+
+                // Let's resolve ownerId if not directly set
+                let orderOwnerId = order.ownerId;
+                if (!orderOwnerId && order.items && order.items.length > 0) {
+                    const firstProduct = await Product.findById(order.items[0].product);
+                    if (firstProduct) {
+                        orderOwnerId = firstProduct.ownerId;
+                    }
+                }
+
+                // Let's create payment record for deposit
+                const invoiceObj = await Invoice.findOne({ rentalOrder: order._id });
+                await Payment.create({
+                    rentalOrder: order._id,
+                    invoice: invoiceObj ? invoiceObj._id : null,
+                    customer: order.customer._id,
+                    amount: order.securityDepositTotal,
+                    paymentMethod: 'Card',
+                    transactionId: `DEP-${Math.floor(10000000 + Math.random() * 90000000)}`,
+                    status: 'Completed',
+                    ownerId: orderOwnerId,
+                    purpose: 'Security Deposit'
+                });
 
                 // Auto-create Pickup record
                 const existingPickup = await Pickup.findOne({ rentalOrder: order._id });
@@ -208,10 +266,10 @@ export const triggerEvent = async (eventName, payload) => {
                         checklist: pickupChecklist,
                         otp: pickupOtp,
                         status: 'Pending',
-                        ownerId: order.ownerId,
+                        ownerId: orderOwnerId,
                         timeline: [{
                             status: 'Pending',
-                            notes: 'Pickup request generated automatically after payment confirmation.'
+                            notes: 'Pickup request generated automatically after deposit hold confirmation.'
                         }]
                     });
                 }
@@ -219,8 +277,8 @@ export const triggerEvent = async (eventName, payload) => {
                 // Notify Customer
                 await sendNotification(
                     order.customer._id,
-                    'Payment Successful',
-                    `Payment of $${order.totalAmount} received for order #${order.orderNumber}! Security Deposit: $${order.securityDepositTotal} is held.`,
+                    'Security Deposit Held',
+                    `Security deposit of $${order.securityDepositTotal} has been successfully paid & held. Pickup OTP is now unlocked!`,
                     'Deposit',
                     order._id
                 );
@@ -420,18 +478,12 @@ export const triggerEvent = async (eventName, payload) => {
                 }
 
                 // Manage deposit refund settlement
-                let penaltyTotal = 0;
-                if (isLateReturn) {
-                    penaltyTotal += (lateFeeCalculated || 0);
-                    order.lateFees = (order.lateFees || 0) + (lateFeeCalculated || 0);
-                }
-                if (requiresRepair) {
-                    penaltyTotal += (repairCost || 0);
-                }
+                // Because late return penalty must have already been paid before confirming return,
+                // the deposit refund should be the full securityDepositTotal, minus only the repair cost (if any)
+                let repairCostTotal = requiresRepair ? (repairCost || 0) : 0;
+                const refundAmount = Math.max(0, order.securityDepositTotal - repairCostTotal);
 
-                const refundAmount = Math.max(0, order.securityDepositTotal - penaltyTotal);
-
-                if (penaltyTotal > 0) {
+                if (repairCostTotal > 0) {
                     order.depositStatus = refundAmount > 0 ? 'Partially Refunded' : 'Deducted/Settled';
                 } else {
                     order.depositStatus = 'Refunded';
@@ -439,7 +491,7 @@ export const triggerEvent = async (eventName, payload) => {
 
                 order.timeline.push({
                     status: 'Completed',
-                    description: `Return processed. Penalty: $${penaltyTotal.toFixed(2)}, Refund processed: $${refundAmount.toFixed(2)}.`,
+                    description: `Return processed. Security Deposit of $${order.securityDepositTotal} refunded: $${refundAmount.toFixed(2)} (Deductions: $${repairCostTotal.toFixed(2)}).`,
                     updatedBy: userId
                 });
                 await order.save();

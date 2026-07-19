@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { FileText, Calendar, ArrowUpRight, QrCode, Trash2, PackageCheck, CheckCircle2, XCircle, Store, MapPin, ShieldCheck } from 'lucide-react';
+import { FileText, Calendar, ArrowUpRight, QrCode, Trash2, PackageCheck, CheckCircle2, XCircle, Store, MapPin, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const OrderHistory = () => {
@@ -38,6 +38,38 @@ export const OrderHistory = () => {
     const [signatures, setSignatures] = useState({});
     const [customerOtps, setCustomerOtps] = useState({});
     const [submittingOtp, setSubmittingOtp] = useState({});
+    const [payingDepositId, setPayingDepositId] = useState(null);
+    const [payingPenaltyId, setPayingPenaltyId] = useState(null);
+
+    const handlePayDeposit = async (orderId) => {
+        setPayingDepositId(orderId);
+        try {
+            const res = await api.post(`/rentals/${orderId}/pay-deposit`);
+            if (res.data.success) {
+                showToast(res.data.message || 'Security deposit authorized & held! Pickup unlocked.', 'success');
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Deposit collection failed.', 'error');
+        } finally {
+            setPayingDepositId(null);
+        }
+    };
+
+    const handlePayPenalty = async (orderId) => {
+        setPayingPenaltyId(orderId);
+        try {
+            const res = await api.post(`/rentals/${orderId}/pay-penalty`);
+            if (res.data.success) {
+                showToast(res.data.message || 'Late penalty paid successfully!', 'success');
+                fetchOrders();
+            }
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Error processing penalty.', 'error');
+        } finally {
+            setPayingPenaltyId(null);
+        }
+    };
 
     const handleVerifyCustomerOtp = async (orderId, pickupId, otpCode) => {
         if (!otpCode || otpCode.trim().length < 4) {
@@ -192,6 +224,13 @@ export const OrderHistory = () => {
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-3">
+                                    {/* Store Pickup / Delivery Badge */}
+                                    <span className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-full border ${order.deliveryType === 'Delivery'
+                                        ? 'bg-blue-500/10 border-blue-555/35 text-blue-600 dark:text-blue-400'
+                                        : 'bg-amber-500/10 border-amber-555/35 text-amber-600 dark:text-amber-400'
+                                        }`}>
+                                        {order.deliveryType || 'Store Pickup'}
+                                    </span>
 
                                     <span className={`text-[10px] uppercase font-black px-3 py-1 rounded-full border ${order.status === 'Overdue'
                                         ? 'bg-red-500/15 border-red-500 text-red-500'
@@ -201,7 +240,6 @@ export const OrderHistory = () => {
                                         }`}>
                                         {order.status}
                                     </span>
-
 
                                     <button
                                         onClick={() => setSelectedQR({ code: `RMS-ORDER-${order._id}`, ref: order.orderNumber })}
@@ -222,7 +260,6 @@ export const OrderHistory = () => {
                                         </button>
                                     )}
 
-
                                     {order.agreementUrl && (
                                         <a
                                             href={order.agreementUrl.startsWith('http') ? order.agreementUrl : `http://localhost:5000${order.agreementUrl}`}
@@ -236,96 +273,113 @@ export const OrderHistory = () => {
                                 </div>
                             </div>
 
-                            {order.pickupId && order.pickupStatus !== 'Completed' && order.pickupStatus !== 'Cancelled' && (
+                            {order.pickupId && order.depositStatus === 'Held' && order.pickupStatus !== 'Completed' && order.pickupStatus !== 'Cancelled' && (
                                 <div className="mt-4 p-4 border border-cyan-500/25 bg-cyan-700/5 dark:bg-cyan-500/5 rounded-2xl space-y-3">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 bg-cyan-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                                            <ShieldCheck className="w-4.5 h-4.5 text-cyan-505 dark:text-cyan-400" />
+                                            <ShieldCheck className="w-4.5 h-4.5 text-cyan-500 dark:text-cyan-400" />
                                         </div>
                                         <div>
-                                            <p className="text-[11px] font-black text-slate-800 dark:text-slate-205 uppercase">Delivery OTP</p>
+                                            <p className="text-[11px] font-black text-slate-800 dark:text-slate-205 uppercase">
+                                                {order.deliveryType === 'Delivery' ? 'Delivery OTP' : 'Store Pickup OTP'}
+                                            </p>
                                             <p className="text-[10px] text-slate-500">
-                                                {order.pickupOtp
-                                                    ? 'Your delivery executive has a code. Share the OTP below with them to confirm receipt.'
-                                                    : 'Waiting for executive to arrive and generate the delivery OTP...'}
+                                                {order.deliveryType === 'Delivery'
+                                                    ? (order.pickupOtp
+                                                        ? 'Your delivery executive has a code. Share the OTP below with them to confirm receipt.'
+                                                        : 'Waiting for executive to arrive and generate the delivery OTP...')
+                                                    : 'Please visit the store and share the OTP below with the store representative to confirm pickup.'
+                                                }
                                             </p>
                                         </div>
                                     </div>
 
                                     {order.pickupOtp ? (
                                         <div className="space-y-3">
-                                            <p className="text-[10px] text-slate-400">Share this OTP with the delivery executive when they arrive to confirm your handoff.</p>
+                                            <p className="text-[10px] text-slate-450">
+                                                {order.deliveryType === 'Delivery'
+                                                    ? 'Share this OTP with the delivery executive when they arrive to confirm your handoff.'
+                                                    : 'Provide this OTP to store staff when collecting items at our counter.'
+                                                }
+                                            </p>
                                             <div className="p-4 bg-emerald-500/8 border-2 border-emerald-500/25 rounded-2xl text-center space-y-1.5">
                                                 <p className="text-[9px] font-black uppercase text-emerald-500 flex items-center justify-center gap-1">
-                                                    <ShieldCheck className="w-3 h-3" /> Your Delivery OTP
+                                                    <ShieldCheck className="w-3 h-3" /> {order.deliveryType === 'Delivery' ? 'Your Delivery OTP' : 'Your Store Pickup OTP'}
                                                 </p>
                                                 <div className="text-3xl font-black font-mono tracking-[0.45em] text-emerald-400 py-1.5">
                                                     {order.pickupOtp}
                                                 </div>
-                                                <p className="text-[9px] text-slate-400">Show this to your delivery executive. They will enter it to confirm delivery.</p>
+                                                <p className="text-[9px] text-slate-400">
+                                                    {order.deliveryType === 'Delivery'
+                                                        ? 'Show this to your delivery executive. They will enter it to confirm delivery.'
+                                                        : 'Show this to store staff. They will verify it to hand over items.'
+                                                    }
+                                                </p>
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="text-[10px] text-slate-450 italic">Waiting for delivery. The executive will generate an OTP once they are on the way.</p>
+                                        <p className="text-[10px] text-slate-450 italic">
+                                            {order.deliveryType === 'Delivery'
+                                                ? 'Waiting for delivery. The executive will generate an OTP once they are on the way.'
+                                                : 'Waiting for pickup. The store staff will verify your order reference.'
+                                            }
+                                        </p>
                                     )}
                                 </div>
                             )}
 
-
+                            {/* STORE PICKUP: simple status card, no tracker */}
                             {/* STORE PICKUP: simple status card, no tracker */}
                             {(!order.deliveryType || order.deliveryType === 'Store Pickup') ? (
                                 <div className="pt-4 space-y-3">
-                                    {/* Pickup info banner */}
-                                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 px-4 py-3">
-                                        <div className="w-8 h-8 rounded-xl bg-brand-500/10 flex items-center justify-center flex-shrink-0">
-                                            <Store className="w-4 h-4 text-brand-500" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">Self Collect at Store</p>
-                                            <p className="text-[10px] text-slate-400">Visit our store with your order QR code to collect your items.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Confirmed & Unpaid → Pay & Sign Contract */}
-                                    {order.status === 'Confirmed' && order.paymentStatus === 'Unpaid' && (
-                                        <div className="p-4 border border-brand-500/25 bg-brand-500/5 rounded-2xl space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 bg-brand-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                    <FileText className="w-4 h-4 text-brand-500" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase">Sign Contract & Complete Payment</p>
-                                                    <p className="text-[10px] text-slate-500">Order approved by partner! Sign agreement contract to authorize security deposit hold and complete rental fee payment.</p>
-                                                </div>
+                                    {/* Pickup info banner - Only show if not fully picked up (Active) or returned */}
+                                    {order.status !== 'Active' && order.status !== 'Completed' && order.status !== 'Delivered' && order.status !== 'Returned' && (
+                                        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 px-4 py-3">
+                                            <div className="w-8 h-8 rounded-xl bg-brand-500/10 flex items-center justify-center flex-shrink-0">
+                                                <Store className="w-4 h-4 text-brand-500" />
                                             </div>
-                                            <div className="flex flex-col sm:flex-row gap-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Type full legal name to e-sign"
-                                                    className="flex-1 glass-input text-xs font-serif italic"
-                                                    value={signatures[order._id] || ''}
-                                                    onChange={e => setSignatures(prev => ({ ...prev, [order._id]: e.target.value }))}
-                                                />
-                                                <button
-                                                    onClick={() => handleSignAndPay(order._id, signatures[order._id])}
-                                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all whitespace-nowrap"
-                                                >
-                                                    Pay &amp; E-Sign (${order.totalAmount.toFixed(2)})
-                                                </button>
+                                            <div>
+                                                <p className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 font-sans">Self Collect at Store</p>
+                                                <p className="text-[10px] text-slate-400">Visit our store with your order QR code to collect your items.</p>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Ready for Pickup or Confirmed & Paid */}
-                                    {(order.status === 'Ready for Pickup' || (order.status === 'Confirmed' && order.paymentStatus === 'Paid')) && (
-                                        <div className="flex items-center gap-3 rounded-2xl border border-teal-400/40 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 px-4 py-3">
-                                            <div className="w-8 h-8 rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                                                <MapPin className="w-4 h-4 text-teal-500" />
+
+                                    {/* Pay Security Deposit Block */}
+                                    {order.status === 'Confirmed' && order.paymentStatus === 'Paid' && order.depositStatus === 'Not Collected' && (
+                                        <div className="p-4 border border-amber-505/25 bg-amber-500/5 rounded-2xl space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 bg-amber-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                    <ShieldCheck className="w-4 h-4 text-amber-505 animate-pulse" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-slate-850 dark:text-slate-205 uppercase">Security Deposit Required</p>
+                                                    <p className="text-[10px] text-slate-500">Before you can receive your pickup OTP code, please pay the refundable security deposit.</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-[11px] font-extrabold text-teal-700 dark:text-teal-300">🎉 Ready for Pickup!</p>
-                                                <p className="text-[10px] text-slate-500">Please visit the store and show your Order Ref #{order.orderNumber} to collect your rented items.</p>
+                                            <button
+                                                onClick={() => handlePayDeposit(order._id)}
+                                                disabled={payingDepositId === order._id}
+                                                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all whitespace-nowrap"
+                                            >
+                                                {payingDepositId === order._id ? '⏳ Processing Deposit...' : `Pay Refundable Security Deposit ($${order.securityDepositTotal.toFixed(2)})`}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Store Pickup OTP display after deposit payment (only show OTP, no pay/sign below it) */}
+                                    {order.depositStatus === 'Held' && ['Confirmed', 'Ready for Pickup'].includes(order.status) && order.pickupOtp && (
+                                        <div className="p-4 bg-emerald-500/5 border-2 border-emerald-555/25 rounded-2xl text-center space-y-1.5">
+                                            <p className="text-[9px] font-black uppercase text-emerald-600 flex items-center justify-center gap-1">
+                                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> VERIFIED: Store Pickup Code
+                                            </p>
+                                            <div className="text-3xl font-black font-mono tracking-[0.45em] text-emerald-600 dark:text-emerald-400 py-1.5 animate-pulse">
+                                                {order.pickupOtp}
                                             </div>
+                                            <p className="text-[10px] text-slate-550">
+                                                Provide this OTP to store staff when collecting items at our counter.
+                                            </p>
                                         </div>
                                     )}
 
@@ -350,6 +404,54 @@ export const OrderHistory = () => {
                                         </div>
                                     )}
 
+                                    {/* Overdue Penalty Payment */}
+                                    {order.status === 'Overdue' && (
+                                        <div className="p-4 border border-rose-500/25 bg-rose-500/5 rounded-2xl space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 bg-rose-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                    <AlertTriangle className="w-4 h-4 text-rose-500" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-slate-805 dark:text-slate-205 uppercase">Late Return Penalty Alert</p>
+                                                    <p className="text-[10px] text-slate-500">Your rental return is overdue. Please settle the late return penalty to enable return check-in.</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handlePayPenalty(order._id)}
+                                                disabled={payingPenaltyId === order._id}
+                                                className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all font-bold"
+                                            >
+                                                {payingPenaltyId === order._id ? '⏳ Processing...' : 'Settle Late Return Penalty'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Ready for Pickup but deposit is not paid yet: helper instruction card */}
+                                    {order.status === 'Ready for Pickup' && order.depositStatus === 'Not Collected' && (
+                                        <div className="flex items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/5 px-4 py-3">
+                                            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                                                <MapPin className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300">Deposit Pending</p>
+                                                <p className="text-[10px] text-slate-500">Please pay security deposit first to obtain store pickup security codes.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Ready for Pickup and deposit is paid: positive status card */}
+                                    {order.status === 'Ready for Pickup' && order.depositStatus === 'Held' && (
+                                        <div className="flex items-center gap-3 rounded-2xl border border-teal-400/40 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 px-4 py-3">
+                                            <div className="w-8 h-8 rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                                                <MapPin className="w-4 h-4 text-teal-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-extrabold text-teal-700 dark:text-teal-300">🎉 Ready for Pickup!</p>
+                                                <p className="text-[10px] text-slate-500">Please visit the store and show the OTP above to collect your items.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Delivered */}
                                     {(order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Returned') && (
                                         <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/40 bg-emerald-500/5 px-4 py-3">
@@ -370,7 +472,7 @@ export const OrderHistory = () => {
                                         { label: 'Staff Confirmed', done: order.status !== 'Pending' },
                                         { label: 'Agreement Signed', done: order.agreementSigned },
                                         { label: 'Out for Rental', done: order.status === 'Active' || order.status === 'Completed' || order.status === 'Delivered' || order.status === 'Overdue' || order.status === 'Return Requested' },
-                                        { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Returned' }
+                                        { label: 'Settled Closed', done: order.status === 'Completed' || order.status === 'Returned' || order.status === 'Delivered' || order.status === 'Active' }
                                     ];
                                     const steps = rawSteps.map((step, idx) => ({
                                         ...step,
@@ -403,6 +505,51 @@ export const OrderHistory = () => {
                                                     </div>
                                                 ))}
                                             </div>
+
+
+                                            {/* Pay Security Deposit Block */}
+                                            {order.status === 'Confirmed' && order.paymentStatus === 'Paid' && order.depositStatus === 'Not Collected' && (
+                                                <div className="p-4 border border-amber-500/25 bg-amber-500/5 rounded-2xl space-y-3 mt-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 bg-amber-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                            <ShieldCheck className="w-4 h-4 text-amber-555" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[11px] font-black text-slate-805 dark:text-slate-205 uppercase">Security Deposit Required</p>
+                                                            <p className="text-[10px] text-slate-505">Before delivery dispatch handoff codes are generated, please pay the security deposit.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handlePayDeposit(order._id)}
+                                                        disabled={payingDepositId === order._id}
+                                                        className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all whitespace-nowrap"
+                                                    >
+                                                        {payingDepositId === order._id ? '⏳ Processing Deposit...' : `Pay Refundable Security Deposit ($${order.securityDepositTotal.toFixed(2)})`}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Overdue Penalty Payment */}
+                                            {order.status === 'Overdue' && (
+                                                <div className="p-4 border border-rose-500/25 bg-rose-555/5 rounded-2xl space-y-3 mt-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 bg-rose-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                            <AlertTriangle className="w-4 h-4 text-rose-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[11px] font-black text-slate-805 dark:text-slate-205 uppercase">Late Return Penalty Alert</p>
+                                                            <p className="text-[10px] text-slate-500">Your return period is overdue. Pay accumulated metrics layout to complete checkout release.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handlePayPenalty(order._id)}
+                                                        disabled={payingPenaltyId === order._id}
+                                                        className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all"
+                                                    >
+                                                        {payingPenaltyId === order._id ? '⏳ Processing...' : 'Settle Late Return Penalty'}
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             {/* Out for delivery / Active → Confirm Receipt */}
                                             {order.status === 'Active' && (

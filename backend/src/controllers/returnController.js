@@ -371,20 +371,45 @@ export const confirmReturn = async (req, res, next) => {
             const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
             if (diffMinutes > gracePeriodMinutes) {
-                const dailyRateTotal = order.items.reduce((acc, it) => acc + (it.rateApplied || 0), 0);
-                const hourlyRateTotal = dailyRateTotal / 24;
-
-                if (settings.lateFeeChargeType === 'hourly') {
-                    lateFee = Math.max(1, lateHours) * hourlyRateTotal * (settings.lateFeeMultiplier || 1.5);
-                } else {
-                    const diffDays = Math.max(1, Math.ceil(lateHours / 24));
-                    lateFee = diffDays * dailyRateTotal * (settings.lateFeeMultiplier || 1.5);
+                // Calculate daily penalty total based on product.penaltyAmount
+                let orderDailyPenalty = 0;
+                for (const it of order.items) {
+                    const prodObj = await Product.findById(it.product);
+                    if (prodObj) {
+                        orderDailyPenalty += (prodObj.penaltyAmount || 0) * (it.quantity || 1);
+                    }
                 }
+
+                // Fallback to dailyRateTotal * lateFeeMultiplier if penaltyAmount is not defined
+                if (orderDailyPenalty === 0) {
+                    const dailyRateTotal = order.items.reduce((acc, it) => acc + (it.rateApplied || 0), 0);
+                    orderDailyPenalty = dailyRateTotal * (settings.lateFeeMultiplier || 1.5);
+                }
+
+                const diffDays = Math.max(1, Math.ceil(lateHours / 24));
+                lateFee = diffDays * orderDailyPenalty;
 
                 if (settings.maxLateFeeLimit && lateFee > settings.maxLateFeeLimit) {
                     lateFee = settings.maxLateFeeLimit;
                 }
                 lateFee = Math.round(lateFee * 100) / 100;
+            }
+        }
+
+        // Verify that if lateFee is calculated, it matches paid penalty record
+        if (isLate && lateFee > 0) {
+            const penaltyPayment = await Payment.findOne({
+                rentalOrder: order._id,
+                purpose: 'Late Return Penalty',
+                status: 'Completed'
+            });
+            if (!penaltyPayment) {
+                return res.status(400).json({
+                    success: false,
+                    errorType: 'OUTSTANDING_PENALTY',
+                    message: `Customer has an outstanding late return penalty of $${lateFee.toFixed(2)}. Make them pay first before finalizing return.`,
+                    lateFee
+                });
             }
         }
 

@@ -15,7 +15,8 @@ import {
     MapPin,
     Settings,
     Cpu,
-    PlusCircle
+    PlusCircle,
+    AlertTriangle
 } from 'lucide-react';
 
 export const Sidebar = () => {
@@ -34,6 +35,8 @@ export const Sidebar = () => {
         { label: 'Manage Products', path: '/partner/products', icon: ShoppingBag },
         { label: 'Register Product', path: '/partner/add-product', icon: PlusCircle },
         { label: 'Rental Contracts', path: '/partner/rentals', icon: CalendarRange },
+        { label: 'Late Returns', path: '/partner/late-returns', icon: AlertTriangle },
+        { label: 'Deposit Ledger', path: '/partner/deposit-ledger', icon: FileText },
         { label: 'Logistics Pickups', path: '/partner/pickups', icon: Truck },
         { label: 'Logistics Returns', path: '/partner/returns', icon: RotateCcw },
         { label: 'Logistics Maps', path: '/partner/maps', icon: MapPin },
@@ -63,14 +66,14 @@ export const Sidebar = () => {
                 <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{user?.role} Workspace</h4>
             </div>
 
-            <nav className="flex-1 space-y-1.5">
+            <nav className="flex-1 space-y-1.5 overflow-y-auto scrollbar-none pr-1">
                 {links.map(link => {
                     const Icon = link.icon;
                     return (
                         <NavLink
                             key={link.path}
                             to={link.path}
-                            end={link.path === '/' || link.path === '/admin'}
+                            end={['/', '/admin', '/partner', '/dashboard'].includes(link.path)}
                             className={({ isActive }) =>
                                 `flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold tracking-wide transition-all ${isActive
                                     ? 'bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/15'

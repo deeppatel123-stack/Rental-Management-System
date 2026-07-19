@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api, useAuth } from '../context/AuthContext';
-import { Box, LifeBuoy, Heart, FileText, ArrowRight } from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { useToast } from '../context/ToastContext';
+import { Box, LifeBuoy, Heart, FileText, ArrowRight, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const CustomerDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const { addToCart } = useCart();
+    const { showToast } = useToast();
 
     const [activeRentals, setActiveRentals] = useState([]);
     const [wishlist, setWishlist] = useState([]);
@@ -36,6 +40,19 @@ export const CustomerDashboard = () => {
         };
         fetchDashboardData();
     }, []);
+
+    const handleRemoveFromWishlist = async (productId) => {
+        try {
+            const res = await api.post('/products/wishlist/toggle', { productId });
+            if (res.data.success) {
+                setWishlist(prev => prev.filter(p => p._id !== productId));
+                showToast('Removed from wishlist.', 'success');
+            }
+        } catch (err) {
+            console.error('Failed to remove wishlist item:', err);
+            showToast('Failed to remove item.', 'error');
+        }
+    };
 
     const stats = [
         { label: 'Active Rentals', count: activeRentals.length, icon: Box, color: 'text-brand-500 bg-brand-500/10' },
@@ -153,6 +170,61 @@ export const CustomerDashboard = () => {
                             ))}
                         </div>
                     )}
+
+                    {/* Saved Wishlist Items */}
+                    <div className="border-t border-slate-200/50 dark:border-slate-800/10 pt-5 mt-5 space-y-4">
+                        <h3 className="font-extrabold text-sm flex items-center gap-2">
+                            <Heart className="w-5 h-5 text-rose-500 fill-rose-500" /> Saved Wishlist ({wishlist.length})
+                        </h3>
+                        {wishlist.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">No products saved in your wishlist yet. Explore the catalogue to save items.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {wishlist.map(prod => (
+                                    <div key={prod._id} className="p-3 bg-slate-100/50 dark:bg-slate-900/60 border border-slate-200/10 rounded-2xl flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900/60 flex-shrink-0">
+                                                <img
+                                                    src={prod.images?.[0] ? (prod.images[0].startsWith('http') ? prod.images[0] : `http://localhost:5000${prod.images[0]}`) : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'}
+                                                    alt={prod.name}
+                                                    className="object-cover w-full h-full"
+                                                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'; }}
+                                                />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className="text-xs font-bold text-slate-900 dark:text-white hover:text-brand-500 truncate">
+                                                    <Link to={`/products/${prod._id}`}>{prod.name}</Link>
+                                                </h4>
+                                                <span className="text-[10px] text-slate-400 block">${prod.priceRate?.daily || prod.priceRate?.daily === 0 ? prod.priceRate.daily : (prod.price || 0)} / day</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            <button
+                                                onClick={() => {
+                                                    const res = addToCart(prod);
+                                                    if (res && res.success === false) {
+                                                        showToast(res.message, 'warning');
+                                                    } else {
+                                                        showToast('Added to cart!', 'success');
+                                                    }
+                                                }}
+                                                className="px-2.5 py-1.5 bg-brand-500 hover:bg-brand-650 text-white text-[10px] font-bold rounded-xl shadow-sm transition-all"
+                                            >
+                                                Rent
+                                            </button>
+                                            <button
+                                                onClick={() => handleRemoveFromWishlist(prod._id)}
+                                                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-rose-500 rounded-lg transition-all"
+                                                title="Remove"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
 

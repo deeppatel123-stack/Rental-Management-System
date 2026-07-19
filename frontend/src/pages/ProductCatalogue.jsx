@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
-import { Search, SlidersHorizontal, Calendar, Info } from 'lucide-react';
+import { Search, SlidersHorizontal, Calendar, Info, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProductCatalogue = () => {
+    const { user } = useAuth();
     const { addToCart, startDate, endDate, setStartDate, setEndDate, totals } = useCart();
     const { showToast } = useToast();
 
@@ -34,6 +35,49 @@ export const ProductCatalogue = () => {
             console.error('Error fetching catalog:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const [wishlistIds, setWishlistIds] = useState([]);
+
+    useEffect(() => {
+        const fetchWishlist = async () => {
+            if (!user || user.role !== 'Customer') return;
+            try {
+                const res = await api.get('/products/wishlist');
+                if (res.data.success) {
+                    setWishlistIds(res.data.products.map(p => p._id));
+                }
+            } catch (err) {
+                console.warn('Failed to load wishlist:', err);
+            }
+        };
+        fetchWishlist();
+    }, [user]);
+
+    const handleToggleWishlist = async (productId) => {
+        if (!user) {
+            showToast('Please login to save items to wishlist.', 'warning');
+            return;
+        }
+        if (user.role !== 'Customer') {
+            showToast('Only customers can wishlist items.', 'warning');
+            return;
+        }
+        try {
+            const res = await api.post('/products/wishlist/toggle', { productId });
+            if (res.data.success) {
+                if (res.data.added) {
+                    setWishlistIds(prev => [...prev, productId]);
+                    showToast('Item saved to wishlist!', 'success');
+                } else {
+                    setWishlistIds(prev => prev.filter(id => id !== productId));
+                    showToast('Removed from wishlist.', 'success');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to toggle wishlist:', err);
+            showToast('Failed to update wishlist.', 'error');
         }
     };
 
@@ -175,6 +219,20 @@ export const ProductCatalogue = () => {
                                     {prod.category}
                                 </span>
 
+                                {(!user || user.role === 'Customer') && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleToggleWishlist(prod._id);
+                                        }}
+                                        className="absolute top-3 right-3 p-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-205 dark:border-slate-800 text-slate-400 hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-sm z-10"
+                                        title="Save to Wishlist"
+                                    >
+                                        <Heart className={`w-3.5 h-3.5 ${wishlistIds.includes(prod._id) ? 'text-rose-500 fill-rose-500' : ''}`} />
+                                    </button>
+                                )}
+
                                 {prod.stock.available <= 0 && (
                                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                         <span className="text-white text-xs font-bold uppercase tracking-wider bg-red-650 px-3 py-1.5 rounded-xl border border-red-500">
@@ -212,28 +270,36 @@ export const ProductCatalogue = () => {
                             </div>
 
 
-                            {prod.stock.available > 0 ? (
-                                <button
-                                    onClick={() => {
-                                        const res = addToCart(prod);
-                                        if (res && res.success === false) {
-                                            showToast(res.message, 'warning');
-                                        } else {
-                                            showToast(`Added ${prod.name} to checkout cart!`, 'success');
-                                        }
-                                    }}
-                                    className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-md transition-all"
+                            <div className="flex gap-2">
+                                <Link
+                                    to={`/products/${prod._id}`}
+                                    className="flex-1 text-center py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold rounded-xl transition-all"
                                 >
-                                    Rent For Period
-                                </button>
-                            ) : (
-                                <button
-                                    disabled
-                                    className="w-full py-2.5 bg-slate-200 dark:bg-slate-900/60 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed"
-                                >
-                                    Reserve Unavailable
-                                </button>
-                            )}
+                                    View Details
+                                </Link>
+                                {prod.stock.available > 0 ? (
+                                    <button
+                                        onClick={() => {
+                                            const res = addToCart(prod);
+                                            if (res && res.success === false) {
+                                                showToast(res.message, 'warning');
+                                            } else {
+                                                showToast(`Added ${prod.name} to checkout cart!`, 'success');
+                                            }
+                                        }}
+                                        className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold rounded-xl shadow-md transition-all animate-none"
+                                    >
+                                        Rent Now
+                                    </button>
+                                ) : (
+                                    <button
+                                        disabled
+                                        className="flex-1 py-2.5 bg-slate-200 dark:bg-slate-900/60 text-slate-450 text-xs font-extrabold rounded-xl cursor-not-allowed"
+                                    >
+                                        Unavailable
+                                    </button>
+                                )}
+                            </div>
                         </motion.div>
                     ))}
                 </div>

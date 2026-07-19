@@ -29,6 +29,7 @@ export const EnterpriseSuite = () => {
     const [products, setProducts] = useState([]);
     const [deliveryOrders, setDeliveryOrders] = useState([]);
     const [employees, setEmployees] = useState([]);
+    const [calendarOrders, setCalendarOrders] = useState([]);
 
     // Form inputs states
     const [newQuote, setNewQuote] = useState({ customerName: '', customerEmail: '', productId: '', quantity: 1, startDate: '', endDate: '' });
@@ -108,6 +109,9 @@ export const EnterpriseSuite = () => {
             } else if (activeTab === 'audit') {
                 const res = await api.get('/enterprise/audit-logs');
                 if (res.data?.success) setAuditLogs(res.data.logs);
+            } else if (activeTab === 'calendars') {
+                const res = await api.get('/rentals');
+                if (res.data?.success) setCalendarOrders(res.data.orders);
             }
         } catch (err) {
             console.error('Failed to load portal component data:', err);
@@ -271,9 +275,9 @@ export const EnterpriseSuite = () => {
                     { id: 'ai', label: 'AI Predict & KPI', icon: Cpu, roles: ['Super Admin'] },
                     { id: 'quotations', label: 'Quotation Engine', icon: FileText, roles: ['Rental Partner'] },
                     { id: 'calendars', label: 'Asset Calendars', icon: Calendar, roles: ['Rental Partner'] },
-                    { id: 'inventory', label: 'Variants & QR', icon: Box, roles: ['Rental Partner'] },
-                    { id: 'deposits', label: 'Deposit Ledgers', icon: DollarSign, roles: ['Rental Partner'] },
-                    { id: 'logistics', label: 'Routing & Logistics', icon: Truck, roles: ['Rental Partner'] },
+                    { id: 'inventory', label: 'Variants & QR', icon: Box, roles: ['Super Admin'] },
+                    { id: 'deposits', label: 'Deposit Ledgers', icon: DollarSign, roles: ['Super Admin'] },
+                    { id: 'logistics', label: 'Routing & Logistics', icon: Truck, roles: ['Super Admin'] },
                     { id: 'repairs', label: 'Inspections & Repairs', icon: Wrench, roles: ['Rental Partner'] },
                     { id: 'coupons', label: 'Promo Coupons', icon: Tag, roles: ['Super Admin'] },
                     { id: 'audit', label: 'Compliance Audit', icon: Activity, roles: ['Super Admin'] },
@@ -500,7 +504,12 @@ export const EnterpriseSuite = () => {
                     {activeTab === 'calendars' && (
                         <div className="glass-panel p-6 rounded-3xl space-y-6">
                             <div>
-                                <h3 className="text-sm font-extrabold">Monthly Asset Rental Calendars &amp; Operation Stops</h3>
+                                <h3 className="text-sm font-extrabold flex items-center justify-between">
+                                    <span>Monthly Asset Rental Calendars &amp; Operation Stops</span>
+                                    <span className="text-xs text-brand-650 bg-brand-500/10 px-2.5 py-1 rounded-lg border border-brand-500/20 font-black uppercase text-brand-500">
+                                        {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                    </span>
+                                </h3>
                                 <p className="text-[11px] text-slate-400">Visualization schedules map of pickups, returns, and resource bookings.</p>
                             </div>
 
@@ -508,20 +517,68 @@ export const EnterpriseSuite = () => {
                                 {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
                                     <div key={day} className="font-black py-2 bg-slate-100 dark:bg-slate-900 rounded-xl text-slate-450">{day.slice(0, 3)}</div>
                                 ))}
-                                {Array.from({ length: 28 }).map((_, idx) => {
-                                    const dateVar = idx + 1;
-                                    const hasReturn = idx % 5 === 0;
-                                    const hasPickup = idx % 7 === 1;
-                                    return (
-                                        <div key={idx} className="min-h-[75px] bg-slate-50 dark:bg-slate-900/60 p-2 rounded-2xl border border-slate-200/5 flex flex-col justify-between">
-                                            <div className="text-[10px] font-bold text-slate-400 text-right">{dateVar}</div>
-                                            <div className="space-y-1">
-                                                {hasPickup && <span className="block text-[8px] bg-indigo-500 text-white rounded px-1.5 py-0.5 truncate text-left">📦 Pickup</span>}
-                                                {hasReturn && <span className="block text-[8px] bg-teal-500 text-white rounded px-1.5 py-0.5 truncate text-left">🏪 Return Stop</span>}
+                                {(() => {
+                                    const now = new Date();
+                                    const year = now.getFullYear();
+                                    const month = now.getMonth();
+                                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                                    const firstDayOfWeek = new Date(year, month, 1).getDay();
+
+                                    const cells = [];
+                                    // Add empty pads for the first week
+                                    for (let i = 0; i < firstDayOfWeek; i++) {
+                                        cells.push(<div key={`pad-${i}`} className="min-h-[85px] bg-slate-100/20 dark:bg-slate-900/10 p-2 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800/40 opacity-30" />);
+                                    }
+
+                                    // Add day cells
+                                    for (let day = 1; day <= daysInMonth; day++) {
+                                        const cellDate = new Date(year, month, day);
+
+                                        // Pickups or Returns matching this calendar day
+                                        const pickupsForDay = calendarOrders.filter(o => {
+                                            const sDate = new Date(o.startDate);
+                                            return sDate.getDate() === day && sDate.getMonth() === month && sDate.getFullYear() === year;
+                                        });
+
+                                        const returnsForDay = calendarOrders.filter(o => {
+                                            const eDate = new Date(o.endDate);
+                                            return eDate.getDate() === day && eDate.getMonth() === month && eDate.getFullYear() === year;
+                                        });
+
+                                        const isToday = now.getDate() === day && now.getMonth() === month && now.getFullYear() === year;
+
+                                        cells.push(
+                                            <div key={`day-${day}`} className={`min-h-[85px] p-2 rounded-2xl border transition-all flex flex-col justify-between ${isToday
+                                                    ? 'bg-brand-500/10 border-brand-500/30 ring-1 ring-brand-500/20'
+                                                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-205/5 hover:border-slate-300 dark:hover:border-slate-700'
+                                                }`}>
+                                                <div className="flex justify-between items-center">
+                                                    {isToday && <span className="text-[7.5px] uppercase font-black px-1 py-0.25 bg-brand-500 text-white rounded">Today</span>}
+                                                    <div className={`text-[10px] font-black ml-auto ${isToday ? 'text-brand-500 font-extrabold scale-110' : 'text-slate-400'}`}>{day}</div>
+                                                </div>
+                                                <div className="space-y-1 mt-1 flex-1 overflow-y-auto max-h-[50px] scrollbar-none">
+                                                    {pickupsForDay.map(o => {
+                                                        const pName = o.items && o.items[0] ? o.items[0].name : 'Item';
+                                                        return (
+                                                            <span key={`p-${o._id}`} className="block text-[8.5px] bg-brand-500 text-white font-extrabold rounded px-1.5 py-0.5 truncate text-left" title={`Pickup: ${pName}`}>
+                                                                📦 {pName}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {returnsForDay.map(o => {
+                                                        const pName = o.items && o.items[0] ? o.items[0].name : 'Item';
+                                                        return (
+                                                            <span key={`r-${o._id}`} className="block text-[8.5px] bg-rose-500 text-white font-extrabold rounded px-1.5 py-0.5 truncate text-left" title={`Return: ${pName}`}>
+                                                                🏪 {pName}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    }
+                                    return cells;
+                                })()}
                             </div>
                         </div>
                     )}
