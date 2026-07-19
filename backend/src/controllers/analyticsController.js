@@ -13,7 +13,7 @@ export const getDashboardStats = async (req, res, next) => {
         const paidOrders = await RentalOrder.find({ paymentStatus: 'Paid', ...ownerQuery });
         const totalRevenue = paidOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
-        // 2. Today's orders
+
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const todayOrders = await RentalOrder.find({
@@ -23,23 +23,23 @@ export const getDashboardStats = async (req, res, next) => {
         });
         const todayRevenue = todayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
-        // 3. Rentals counters
+
         const totalRentalsCount = await RentalOrder.countDocuments(ownerQuery);
         const activeRentalsCount = await RentalOrder.countDocuments({ status: { $in: ['Active', 'Delivered'] }, ...ownerQuery });
 
-        // 4. Overdue
+
         const overdueCount = await RentalOrder.countDocuments({
             status: { $in: ['Active', 'Picked Up', 'Delivered'] },
             endDate: { $lt: now },
             ...ownerQuery
         });
 
-        // 5. Deposits
+
         const depositsHeld = await Deposit.find({ status: 'Held', ...ownerQuery });
         const totalDepositsHeldAmount = depositsHeld.reduce((sum, d) => sum + d.amountHeld, 0);
         const pendingRefundsCount = await Deposit.countDocuments({ status: 'Processing', ...ownerQuery });
 
-        // 6. Monthly chart breakdown
+
         const monthlyRevenue = {};
         const monthsName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -63,7 +63,7 @@ export const getDashboardStats = async (req, res, next) => {
             revenue: Math.round(monthlyRevenue[key] * 100) / 100
         }));
 
-        // 7. Products and Activities
+
         const products = await Product.find(ownerQuery).limit(5);
         const recentOrders = await RentalOrder.find(ownerQuery)
             .populate('customer', 'name')
@@ -79,12 +79,12 @@ export const getDashboardStats = async (req, res, next) => {
             date: o.createdAt
         }));
 
-        // AI forecasts
+
         const revenuePredictions = await predictRevenue();
         const predictiveMaintenanceList = await getPredictiveMaintenance();
         const demandForecasts = await getDemandForecasting();
 
-        // 8. Staff-wise Admin Oversight Reports
+
         let staffReports = [];
         if (req.user?.role === 'Super Admin') {
             const staffUsers = await User.find({ role: { $in: ['Rental Partner', 'Super Admin'] } }).select('name email role');
