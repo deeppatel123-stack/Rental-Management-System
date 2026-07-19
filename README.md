@@ -121,3 +121,8 @@ Rental Management System/
 4.  **Instant Handover:** Under the **Logistics** -> **Pickup Workflow** tab (Partner/Employee), click **⚡ Confirm Handover & Complete Pickup** to activate the rental.
 5.  **Return & Refund:** In logistics -> **Return Workflow**, inspect the return status, input minor/major damages (if any), and click **Complete Return** to restore stock and refund deposits.
 6.  **Print Record:** Visit **Order History** as customer, and tap **View Invoice** to inspect or print the white-theme document.
+
+Developed by :-
+
+Deep Patel
+Bahumik Kothiya
