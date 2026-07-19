@@ -36,6 +36,42 @@ export const initCronJob = () => {
                 endDate: { $lt: now }
             }).populate('customer');
 
+            // Scan for upcoming return deadlines (due within next 24 hours)
+            const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+            const upcomingOrders = await RentalOrder.find({
+                status: { $in: ['Active', 'Picked Up', 'Delivered'] },
+                endDate: { $gte: now, $lte: tomorrow }
+            }).populate('customer');
+
+            for (const order of upcomingOrders) {
+                if (!order.customer) continue;
+                const existingNotif = await Notification.findOne({
+                    user: order.customer._id,
+                    type: 'Rental',
+                    title: '📅 Return Deadline Reminder',
+                    referenceId: order._id
+                });
+
+                if (!existingNotif) {
+                    const itemsStr = order.items.map(it => it.name).join(', ');
+                    await Notification.create({
+                        user: order.customer._id,
+                        title: '📅 Return Deadline Reminder',
+                        message: `Reminder: Your rental for "${itemsStr}" (Order #${order.orderNumber}) is due for return by ${new Date(order.endDate).toLocaleDateString()}. Please prepare items for collection/drop-off.`,
+                        type: 'Rental',
+                        referenceId: order._id
+                    });
+
+                    if (ioInstance) {
+                        ioInstance.to(order.customer._id.toString()).emit('notification', {
+                            title: '📅 Return Deadline Reminder',
+                            message: `Your rental for "${itemsStr}" is due for return soon.`
+                        });
+                    }
+                    console.log(`[Cron] Sent upcoming return deadline notification for Order #${order.orderNumber}`);
+                }
+            }
+
             for (const order of overdueOrders) {
 
                 const diffMs = now - order.endDate;

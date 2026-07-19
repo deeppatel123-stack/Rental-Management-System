@@ -41,6 +41,8 @@ import { AddProductPage } from './pages/AddProductPage';
 import { ManageExecutives } from './pages/ManageExecutives';
 import LateReturns from './pages/LateReturns';
 import DepositLedger from './pages/DepositLedger';
+import RentedAssets from './pages/RentedAssets';
+import RentalCalendar from './pages/RentalCalendar';
 
 
 import { Bell, X } from 'lucide-react';
@@ -131,6 +133,12 @@ const AppContent = () => {
             } />
             <Route path="/orders" element={
               <ProtectedRoute allowedRoles={['Customer']}><OrderHistory /></ProtectedRoute>
+            } />
+            <Route path="/rented-assets" element={
+              <ProtectedRoute allowedRoles={['Customer']}><RentedAssets /></ProtectedRoute>
+            } />
+            <Route path="/rental-calendar" element={
+              <ProtectedRoute allowedRoles={['Customer']}><RentalCalendar /></ProtectedRoute>
             } />
             <Route path="/support" element={
               <ProtectedRoute allowedRoles={['Customer']}><Support /></ProtectedRoute>

@@ -483,7 +483,7 @@ export const PickupWorkflow = () => {
 
                                         {/* Mini progress bar */}
                                         <div className="flex items-center gap-1">
-                                            {['Pending', 'Assigned', 'Scheduled', 'On The Way', 'OTP Verified', 'Completed'].map((s, idx) => {
+                                            {['Pending', 'Assigned', 'Completed'].map((s, idx) => {
                                                 const sRank = STEP_ORDER.indexOf(s);
                                                 const curRank = STEP_ORDER.indexOf(pickup.status);
                                                 const done = sRank <= curRank;

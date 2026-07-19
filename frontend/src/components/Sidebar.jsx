@@ -26,6 +26,8 @@ export const Sidebar = () => {
         { label: 'Overview', path: '/dashboard', icon: Home },
         { label: 'Browse Rentals', path: '/catalog', icon: ShoppingBag },
         { label: 'Rental Orders', path: '/orders', icon: FileText },
+        { label: 'Rented Assets', path: '/rented-assets', icon: RotateCcw },
+        { label: 'Rental Calendar', path: '/rental-calendar', icon: CalendarRange },
         { label: 'Support Desk', path: '/support', icon: LifeBuoy },
         { label: 'Setting Profile', path: '/profile', icon: User },
     ];

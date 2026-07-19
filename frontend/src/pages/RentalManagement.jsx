@@ -132,14 +132,14 @@ export const RentalManagement = () => {
                 <div className="glass-panel rounded-3xl overflow-x-auto border border-slate-205 dark:border-slate-800/10">
                     <table className="w-full text-left text-xs">
                         <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-455 uppercase font-black tracking-wider whitespace-nowrap">
-                                <th className="px-5 py-3.5">Contract Agreement</th>
-                                <th className="px-5 py-3.5">Customer details</th>
-                                <th className="px-5 py-3.5">Booking Days</th>
-                                <th className="px-5 py-3.5 text-center">Settlement Status</th>
-                                <th className="px-5 py-3.5 text-center">Escrow Value</th>
-                                <th className="px-5 py-3.5">Signature Name</th>
-                                <th className="px-5 py-3.5 text-right">Actions</th>
+                            <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase font-extrabold tracking-wider whitespace-nowrap">
+                                <th className="px-3.5 py-3 text-[10px]">Contract Agreement</th>
+                                <th className="px-3.5 py-3 text-[10px]">Customer Details</th>
+                                <th className="px-3.5 py-3 text-[10px]">Booking Days</th>
+                                <th className="px-3.5 py-3 text-[10px] text-center">Settlement</th>
+                                <th className="px-3.5 py-3 text-[10px] text-center">Escrow Value</th>
+                                <th className="px-3.5 py-3 text-[10px]">Signature</th>
+                                <th className="px-3.5 py-3 text-[10px] text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
@@ -148,7 +148,7 @@ export const RentalManagement = () => {
                                     <tr className="hover:bg-slate-100/30 dark:hover:bg-slate-900/10 border-b border-slate-100 dark:border-slate-850">
                                         <td
                                             onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}
-                                            className="px-5 py-4 min-w-[200px] max-w-[320px] cursor-pointer group"
+                                            className="px-3 py-3 min-w-[150px] max-w-[260px] cursor-pointer group"
                                         >
                                             <span className="text-[10px] text-slate-400 font-mono block font-extrabold uppercase whitespace-nowrap group-hover:text-brand-500 transition-colors">
                                                 ID: {order.orderNumber}
@@ -175,14 +175,22 @@ export const RentalManagement = () => {
                                                 })()}
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 whitespace-nowrap">
+                                        <td className="px-3 py-3 whitespace-nowrap">
                                             <span className="font-bold block text-slate-850 dark:text-slate-205">{order.customer?.name}</span>
                                             <span className="text-[10px] text-slate-400 font-medium">{order.customer?.email}</span>
                                         </td>
-                                        <td className="px-5 py-4 text-slate-550 dark:text-slate-350 whitespace-nowrap">
-                                            {new Date(order.startDate).toLocaleDateString()} - {new Date(order.endDate).toLocaleDateString()}
+                                        <td className="px-3 py-3 text-slate-550 dark:text-slate-350 whitespace-nowrap">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200">
+                                                    {new Date(order.startDate).toLocaleDateString()}
+                                                </span>
+                                                <div className="h-[1px] w-4 bg-slate-300 dark:bg-slate-700 my-0.5"></div>
+                                                <span className="text-[10.5px] font-bold text-slate-400">
+                                                    {new Date(order.endDate).toLocaleDateString()}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td className="px-5 py-4 text-center whitespace-nowrap">
+                                        <td className="px-3 py-3 text-center whitespace-nowrap">
                                             <select
                                                 value={order.status}
                                                 disabled={updatingId === order._id}
@@ -207,13 +215,13 @@ export const RentalManagement = () => {
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="px-5 py-4 text-center font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                        <td className="px-3 py-3 text-center font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                                             ${(order.totalAmount || 0).toFixed(2)}
                                         </td>
-                                        <td className="px-5 py-4 italic font-serif text-slate-500 text-xs whitespace-nowrap">
+                                        <td className="px-3 py-3 italic font-serif text-slate-500 text-xs whitespace-nowrap">
                                             {order.customerSignature || (order.customer ? order.customer.name : 'E-Signed')}
                                         </td>
-                                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                                        <td className="px-3 py-3 text-right whitespace-nowrap">
                                             {(order.status === 'Pending' || order.status === 'Quotation') ? (
                                                 <button
                                                     onClick={() => handleConfirmOrder(order._id)}

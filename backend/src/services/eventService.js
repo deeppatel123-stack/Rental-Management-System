@@ -332,33 +332,6 @@ export const triggerEvent = async (eventName, payload) => {
                     order._id
                 );
 
-                // Auto-create Return record as Pending under Return Logistics
-                const existingReturn = await Return.findOne({ rentalOrder: order._id });
-                if (!existingReturn) {
-                    const returnOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                    const returnChecklist = order.items.map(it => ({
-                        productName: it.name,
-                        serialNumber: '',
-                        status: 'Returned',
-                        conditionRating: 'Excellent'
-                    }));
-
-                    await Return.create({
-                        rentalOrder: order._id,
-                        customer: order.customer._id,
-                        productId: order.items[0]?.product,
-                        scheduledDate: order.endDate,
-                        checklist: returnChecklist,
-                        otp: returnOtp,
-                        status: 'Pending',
-                        ownerId: order.ownerId,
-                        timeline: [{
-                            status: 'Pending',
-                            notes: 'Return item record initialized automatically after pickup completion.'
-                        }]
-                    });
-                }
-
                 if (io) {
                     io.emit('order_refreshed', { orderId: order._id, status: 'Delivered' });
                 }

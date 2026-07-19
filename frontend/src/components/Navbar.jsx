@@ -26,6 +26,12 @@ export const Navbar = () => {
             </div>
 
             <div className="flex items-center gap-4">
+                <Link
+                    to="/catalog"
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/20 text-slate-700 dark:text-slate-300 hover:text-brand-500 text-xs font-bold transition-all"
+                >
+                    Product Catalogue
+                </Link>
 
                 <button
                     onClick={toggleTheme}
@@ -36,7 +42,7 @@ export const Navbar = () => {
                 </button>
 
 
-                {user?.role === 'Customer' && (
+                {(!user || user.role === 'Customer') && (
                     <Link
                         to="/cart"
                         className="relative p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/20 text-slate-600 dark:text-slate-300 hover:text-brand-500 transition-all"

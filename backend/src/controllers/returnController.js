@@ -9,6 +9,7 @@ import Notification from '../models/Notification.js';
 import RepairTicket from '../models/RepairTicket.js';
 import User from '../models/User.js';
 import Product from '../models/Product.js';
+import Payment from '../models/Payment.js';
 import { generateQRCode } from '../services/qrService.js';
 import { triggerEvent } from '../services/eventService.js';
 
@@ -32,7 +33,16 @@ export const getReturns = async (req, res, next) => {
             .populate('productId', 'name sku images')
             .sort({ createdAt: -1 });
 
-        res.json({ success: true, count: returns.length, returns });
+        // Only show returns if they are no longer Pending, OR if they are Pending and the customer has explicitly requested a return.
+        const filteredReturns = returns.filter(r => {
+            if (!r.rentalOrder) return false;
+            if (r.status === 'Pending') {
+                return r.rentalOrder.status === 'Return Requested';
+            }
+            return true;
+        });
+
+        res.json({ success: true, count: filteredReturns.length, returns: filteredReturns });
     } catch (error) {
         next(error);
     }

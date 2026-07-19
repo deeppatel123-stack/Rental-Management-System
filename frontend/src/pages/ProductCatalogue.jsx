@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
-import { Search, SlidersHorizontal, Calendar, Info, Heart } from 'lucide-react';
+import { Search, SlidersHorizontal, Calendar, Info, Heart, LayoutGrid, List } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProductCatalogue = () => {
@@ -17,6 +17,7 @@ export const ProductCatalogue = () => {
     const [brand, setBrand] = useState('');
     const [sort, setSort] = useState('');
     const [loading, setLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
 
     const categoriesList = ['Cameras', 'Laptops', 'Audio', 'Gimbals'];
@@ -178,6 +179,25 @@ export const ProductCatalogue = () => {
                         <option value="priceAsc">Price: Low to High</option>
                         <option value="priceDesc">Price: High to Low</option>
                     </select>
+
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200/10">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-brand-500 text-white shadow-md' : 'text-slate-400 hover:text-brand-500'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('list')}
+                            className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-brand-500 text-white shadow-md' : 'text-slate-400 hover:text-brand-500'}`}
+                            title="List View"
+                        >
+                            <List className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -199,7 +219,7 @@ export const ProductCatalogue = () => {
                     <h3 className="text-md font-bold">No rental products available</h3>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto">Try clearing search phrases or catalog categories tag selections.</p>
                 </div>
-            ) : (
+            ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {products.map(prod => (
                         <motion.div
@@ -265,7 +285,7 @@ export const ProductCatalogue = () => {
                                 </div>
                                 <div className="text-right">
                                     <span className="text-xs text-slate-450">Deposit Hold</span>
-                                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${prod.securityDeposit}</p>
+                                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-450">${prod.securityDeposit}</p>
                                 </div>
                             </div>
 
@@ -299,6 +319,120 @@ export const ProductCatalogue = () => {
                                         Unavailable
                                     </button>
                                 )}
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {products.map(prod => (
+                        <motion.div
+                            layout
+                            key={prod._id}
+                            className="glass-card rounded-[2rem] p-5 flex flex-col md:flex-row gap-6 justify-between items-center"
+                        >
+                            <div className="flex flex-col md:flex-row gap-5 items-center w-full flex-1">
+                                <div className="relative w-full md:w-44 aspect-video rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900/60 flex items-center justify-center flex-shrink-0">
+                                    <img
+                                        src={prod.images[0] ? (prod.images[0].startsWith('http') ? prod.images[0] : `http://localhost:5000${prod.images[0]}`) : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'}
+                                        alt={prod.name}
+                                        className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
+                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400'; }}
+                                    />
+                                    <span className="absolute top-3 left-3 text-[10px] uppercase font-extrabold bg-brand-500 text-white px-2 py-1 rounded-lg">
+                                        {prod.category}
+                                    </span>
+                                    {prod.stock.available <= 0 && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <span className="text-white text-xs font-bold uppercase tracking-wider bg-red-650 px-3 py-1.5 rounded-xl border border-red-500">
+                                                Rented out
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 space-y-2 w-full text-left">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-bold text-base hover:text-brand-500 transition-colors">
+                                                <Link to={`/products/${prod._id}`}>{prod.name}</Link>
+                                            </h3>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-500 mt-1">
+                                                ★ 4.8 <span className="text-slate-400">| Partner: {prod.ownerName || 'Rental Desk'}</span>
+                                            </div>
+                                        </div>
+
+                                        {(!user || user.role === 'Customer') && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleToggleWishlist(prod._id);
+                                                }}
+                                                className="p-1.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500 transition-all shadow-sm"
+                                                title="Save to Wishlist"
+                                            >
+                                                <Heart className={`w-3.5 h-3.5 ${wishlistIds.includes(prod._id) ? 'text-rose-500 fill-rose-500' : ''}`} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl">
+                                        {prod.description || 'Professional rental hardware suited for commercial operations.'}
+                                    </p>
+
+                                    <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-bold">
+                                        <span>Branch: {prod.branchId || 'Main'}</span>
+                                        <span>•</span>
+                                        <span className="text-brand-500">Available: {prod.stock?.available || 0} qty</span>
+                                        <span>•</span>
+                                        <span>SKU: {prod.sku || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col md:flex-col gap-4 items-center w-full md:w-36 justify-between border-t md:border-t-0 md:border-l border-slate-200/50 dark:border-slate-800/10 pt-4 md:pt-0 md:pl-6 flex-shrink-0">
+                                <div className="flex justify-between w-full md:flex-col items-center md:items-end gap-1">
+                                    <div className="text-left md:text-right">
+                                        <span className="text-[10px] text-slate-450 font-semibold">Rate</span>
+                                        <p className="text-sm font-black text-slate-700 dark:text-white">${prod.priceRate.daily} <span className="text-[9px] font-normal">/ day</span></p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-[10px] text-slate-450 font-semibold">Deposit</span>
+                                        <p className="text-xs font-bold text-emerald-600 dark:text-emerald-450">${prod.securityDeposit}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 w-full flex-col">
+                                    <Link
+                                        to={`/products/${prod._id}`}
+                                        className="w-full text-center py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-all"
+                                    >
+                                        Details
+                                    </Link>
+                                    {prod.stock.available > 0 ? (
+                                        <button
+                                            onClick={() => {
+                                                const res = addToCart(prod);
+                                                if (res && res.success === false) {
+                                                    showToast(res.message, 'warning');
+                                                } else {
+                                                    showToast(`Added ${prod.name} to checkout cart!`, 'success');
+                                                }
+                                            }}
+                                            className="w-full py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold rounded-xl shadow-md transition-all"
+                                        >
+                                            Rent Now
+                                        </button>
+                                    ) : (
+                                        <button
+                                            disabled
+                                            className="w-full py-2 bg-slate-200 dark:bg-slate-900/60 text-slate-450 text-xs font-extrabold rounded-xl cursor-not-allowed"
+                                        >
+                                            Unavailable
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     ))}

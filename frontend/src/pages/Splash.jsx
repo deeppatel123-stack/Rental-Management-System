@@ -129,7 +129,7 @@ export const Splash = () => {
                     </button>
                     <button
                         onClick={() => navigate('/catalog')}
-                        className="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold rounded-2xl transition-all text-xs tracking-wider uppercase"
+                        className="w-full sm:w-auto px-8 py-3.5 bg-white/10 dark:bg-slate-900/50 border border-brand-500/20 text-slate-800 dark:text-slate-200 hover:bg-brand-500/10 hover:border-brand-500/40 font-bold rounded-2xl transition-all text-xs tracking-wider uppercase"
                     >
                         Product Catalogue
                     </button>

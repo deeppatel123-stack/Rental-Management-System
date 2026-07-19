@@ -572,26 +572,7 @@ export const OrderHistory = () => {
                                                 </div>
                                             )}
 
-                                            {/* Received / Delivered → Request Return */}
-                                            {order.status === 'Delivered' && (
-                                                <div className="mt-2 rounded-2xl border border-brand-400/35 bg-brand-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center flex-shrink-0">
-                                                            <PackageCheck className="w-5 h-5 text-brand-500" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-extrabold text-brand-700 dark:text-brand-300">📦 Delivery Confirmed — Active Rental</p>
-                                                            <p className="text-[10.5px] text-slate-500">Enjoy your items! Click below when ready to schedule return pickup collection.</p>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleRequestReturn(order._id)}
-                                                        className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-extrabold rounded-xl shadow-md transition-all flex-shrink-0"
-                                                    >
-                                                        <PackageCheck className="w-3.5 h-3.5" /> Request Return
-                                                    </button>
-                                                </div>
-                                            )}
+
 
                                             {/* Completed / Settled */}
                                             {(order.status === 'Completed' || order.status === 'Returned') && (
