@@ -10,9 +10,8 @@ export const getDashboardStats = async (req, res, next) => {
         const isPartner = req.user?.role === 'Rental Partner';
         const ownerQuery = isPartner ? { ownerId: req.user.id } : {};
 
-        // 1. Paid orders filter
         const paidOrders = await RentalOrder.find({ paymentStatus: 'Paid', ...ownerQuery });
-        const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.totalAmount - o.securityDepositTotal), 0);
+        const totalRevenue = paidOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
         // 2. Today's orders
         const startOfDay = new Date();
@@ -22,7 +21,7 @@ export const getDashboardStats = async (req, res, next) => {
             createdAt: { $gte: startOfDay },
             ...ownerQuery
         });
-        const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.totalAmount - o.securityDepositTotal), 0);
+        const todayRevenue = todayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
         // 3. Rentals counters
         const totalRentalsCount = await RentalOrder.countDocuments(ownerQuery);
@@ -55,7 +54,7 @@ export const getDashboardStats = async (req, res, next) => {
             const date = new Date(o.createdAt);
             const key = `${monthsName[date.getMonth()]} ${date.getFullYear().toString().slice(-2)}`;
             if (monthlyRevenue[key] !== undefined) {
-                monthlyRevenue[key] += (o.totalAmount - o.securityDepositTotal);
+                monthlyRevenue[key] += o.totalAmount;
             }
         });
 
@@ -92,7 +91,7 @@ export const getDashboardStats = async (req, res, next) => {
             for (const staff of staffUsers) {
                 const staffProductsCount = await Product.countDocuments({ ownerId: staff._id });
                 const staffOrders = await RentalOrder.find({ ownerId: staff._id });
-                const staffRevenue = staffOrders.reduce((sum, o) => sum + (o.totalAmount - o.securityDepositTotal), 0);
+                const staffRevenue = staffOrders.reduce((sum, o) => sum + o.totalAmount, 0);
                 const staffDeposits = staffOrders.reduce((sum, o) => sum + o.securityDepositTotal, 0);
                 const staffReturns = staffOrders.filter(o => o.status === 'Returned').length;
                 const staffPending = staffOrders.filter(o => o.status === 'Pending').length;

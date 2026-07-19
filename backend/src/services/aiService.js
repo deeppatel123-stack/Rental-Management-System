@@ -6,28 +6,28 @@ import Inventory from '../models/Inventory.js';
 export const predictRevenue = async () => {
     const orders = await RentalOrder.find({ paymentStatus: 'Paid' });
 
-    
+
     const monthlyRevenue = {};
     orders.forEach(o => {
         const yearMonth = `${o.createdAt.getFullYear()}-${String(o.createdAt.getMonth() + 1).padStart(2, '0')}`;
-        monthlyRevenue[yearMonth] = (monthlyRevenue[yearMonth] || 0) + (o.totalAmount - o.securityDepositTotal); 
+        monthlyRevenue[yearMonth] = (monthlyRevenue[yearMonth] || 0) + o.totalAmount;
     });
 
     const months = Object.keys(monthlyRevenue).sort();
     const values = months.map(m => monthlyRevenue[m]);
 
-    let baseline = 5000; 
+    let baseline = 5000;
     if (values.length > 0) {
         baseline = values.reduce((a, b) => a + b, 0) / values.length;
     }
 
-    
-    const growthRate = 1.08; 
+
+    const growthRate = 1.08;
     const nextMonthPrediction = baseline * growthRate;
 
-    
+
     const monthNow = new Date().getMonth();
-    const isSummerOrFestive = [5, 6, 11].includes(monthNow); 
+    const isSummerOrFestive = [5, 6, 11].includes(monthNow);
     const seasonalMultiplier = isSummerOrFestive ? 1.25 : 1.0;
 
     return {
@@ -46,10 +46,10 @@ export const getPredictiveMaintenance = async () => {
     for (const item of inventoryItems) {
         if (!item.product) continue;
 
-        
+
         const usageCount = item.movementHistory.filter(h => h.action === 'Rental Pickup').length;
 
-        
+
         const threshold = 15;
         let riskFactor = 'Low';
         let recommendations = 'Regular inspection';
@@ -81,14 +81,14 @@ export const getPredictiveMaintenance = async () => {
 
 
 export const getProductRecommendations = async (userId) => {
-    
+
     const products = await Product.find({ status: 'Available' }).limit(10);
 
-    
-    
+
+
     return products.slice(0, 4).map((p, idx) => ({
         product: p,
-        matchScore: 98 - (idx * 5), 
+        matchScore: 98 - (idx * 5),
         reason: idx === 0 ? 'Trending Category' : idx === 1 ? 'Highly Rated items' : 'Frequently Rented Together'
     }));
 };
@@ -99,7 +99,7 @@ export const getDemandForecasting = async () => {
     const categories = [...new Set(products.map(p => p.category))];
 
     return categories.map(cat => {
-        
+
         const baseDemand = 40 + Math.floor(Math.random() * 50);
         const growthTrend = Math.random() > 0.4 ? 'Upward' : 'Stable';
         return {
